@@ -793,10 +793,13 @@ function mostrarTelaPendente(){
   document.getElementById('auth-pending-screen').style.display = 'flex';
 }
 
-function doLogout(){
+async function doLogout(){
   if(usuarioAtual) registrarEvento('logout', null, usuarioAtual.email);
   const token = localStorage.getItem(SESSION_KEY);
-  if(token) sb.rpc('encerrar_sessao', {p_token: token}).catch(()=>{});
+  if(token){
+    try{ await sb.rpc('encerrar_sessao', {p_token: token}); }
+    catch(e){ console.warn('Falha ao encerrar sessão no servidor:', e); }
+  }
   usuarioAtual = null;
   usuarioAtualSenha = null;
   localStorage.removeItem(SESSION_KEY);
