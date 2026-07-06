@@ -420,6 +420,18 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   </div>
 
   <div class="card">
+    <div class="ct">Solicitações de upgrade para Editor</div>
+    <div class="ms" style="margin-bottom:.75rem;">Contas @tecnoplanta.com.br entram automaticamente como Visualizador; se pediram acesso de Editor, aparecem aqui até você aprovar.</div>
+    <div class="tw">
+      <table id="cfg-upgrade-tabela" style="min-width:0;">
+        <thead><tr><th>Nome</th><th>Email</th><th>Nível atual</th><th></th></tr></thead>
+        <tbody id="cfg-upgrade-tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="cfg-upgrade-empty" style="display:none;">Nenhuma solicitação de upgrade pendente.</div>
+  </div>
+
+  <div class="card">
     <div class="ct">Usuários cadastrados</div>
     <div class="tw">
       <table id="cfg-usuarios-tabela" style="min-width:0;">
@@ -736,11 +748,15 @@ async function doRegister(){
     }
 
     const novo = Array.isArray(data) ? data[0] : data;
-    registrarEvento('conta_criada', novo.permissao, email);
+    registrarEvento('conta_criada', novo.permissao+(novo.permissao_solicitada?' (pediu '+novo.permissao_solicitada+')':''), email);
 
-    if(novo.permissao === 'admin'){
+    if(novo.status === 'aprovado'){
       usuarioAtualSenha = senha;
       if(novo.token) localStorage.setItem(SESSION_KEY, novo.token);
+      if(novo.permissao_solicitada){
+        // Mostra o aviso rapidinho antes de entrar, já que a tela vai trocar.
+        alert('Conta criada! Você já pode acessar como Visualizador. Sua solicitação de acesso como Editor ficará aguardando aprovação de um administrador.');
+      }
       iniciarSessao(novo);
       return;
     }
@@ -826,7 +842,7 @@ function aplicarPermissoes(){
   const paginaInicial = (p==='admin' || p==='editor') ? 'page-lancamento' : 'page-dashboard';
   trocarAba(paginaInicial, document.querySelector('.nt[data-page="'+paginaInicial+'"]'));
 
-  if(p==='admin'){ renderAprovacoes(); renderUsuarios(); }
+  if(p==='admin'){ renderAprovacoes(); renderSolicitacoesUpgrade(); renderUsuarios(); }
 }
 
 // ── ADMIN: APROVAÇÕES E GESTÃO DE USUÁRIOS ──────────────────────────────
@@ -858,6 +874,7 @@ async function aprovarUsuario(email){
   registrarEvento('usuario_aprovado', email, usuarioAtual.email);
   await carregarUsuarios();
   renderAprovacoes();
+  renderSolicitacoesUpgrade();
   renderUsuarios();
 }
 
@@ -892,6 +909,47 @@ function renderUsuarios(){
   document.getElementById('cfg-usuarios-tabela').style.display = aprovados.length ? 'table' : 'none';
 }
 
+// Contas @tecnoplanta.com.br entram como Visualizador na hora, mas se
+// pediram Editor, aparecem aqui aguardando promoção.
+function renderSolicitacoesUpgrade(){
+  const cont = document.getElementById('cfg-upgrade-tbody');
+  if(!cont) return;
+  const pendentes = usuarios.filter(u=>u.status==='aprovado' && u.permissao_solicitada);
+  cont.innerHTML = pendentes.map(u=>`
+    <tr>
+      <td>${escapeHtml(u.nome)}</td><td>${escapeHtml(u.email)}</td><td>${escapeHtml(NOMES_PERMISSAO[u.permissao]||u.permissao)}</td>
+      <td><div style="display:flex;gap:6px;">
+        <button class="btn bp" style="padding:5px 12px;font-size:11px;" onclick="promoverUsuarioEditor(${jsAttr(u.email)})">Promover a Editor</button>
+        <button class="btn bd2" onclick="recusarPromocaoUsuario(${jsAttr(u.email)})">Recusar</button>
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('cfg-upgrade-empty').style.display = pendentes.length ? 'none' : 'block';
+  document.getElementById('cfg-upgrade-tabela').style.display = pendentes.length ? 'table' : 'none';
+}
+
+async function promoverUsuarioEditor(email){
+  const {error} = await sb.rpc('promover_usuario_editor', {
+    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
+  });
+  if(error){ avisoErroSupabase('promover usuário', error); return; }
+  registrarEvento('usuario_promovido_editor', email, usuarioAtual.email);
+  await carregarUsuarios();
+  renderSolicitacoesUpgrade();
+  renderUsuarios();
+}
+
+async function recusarPromocaoUsuario(email){
+  if(!confirm('Recusar o pedido de acesso como Editor? A pessoa continua como Visualizador.')) return;
+  const {error} = await sb.rpc('recusar_promocao_usuario', {
+    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
+  });
+  if(error){ avisoErroSupabase('recusar promoção', error); return; }
+  registrarEvento('promocao_recusada', email, usuarioAtual.email);
+  await carregarUsuarios();
+  renderSolicitacoesUpgrade();
+  renderUsuarios();
+}
+
 async function alterarPermissaoUsuario(email, novaPermissao){
   if(email === ADMIN_EMAIL) return;
   const {error} = await sb.rpc('alterar_permissao_usuario', {
@@ -901,6 +959,7 @@ async function alterarPermissaoUsuario(email, novaPermissao){
   if(error){ avisoErroSupabase('alterar permissão', error); return; }
   registrarEvento('permissao_alterada', email+' -> '+novaPermissao, usuarioAtual.email);
   await carregarUsuarios();
+  renderSolicitacoesUpgrade();
   renderUsuarios();
 }
 
@@ -913,6 +972,7 @@ async function removerUsuario(email){
   if(error){ avisoErroSupabase('remover usuário', error); return; }
   registrarEvento('usuario_removido', email, usuarioAtual.email);
   await carregarUsuarios();
+  renderSolicitacoesUpgrade();
   renderUsuarios();
 }
 
@@ -1218,9 +1278,9 @@ function trocarAba(pageId, btn){
     carregarLancamentos().then(()=>{ popularFiltros(); renderDashboard(); });
   }
   if(pageId==='page-config'){
-    renderConfigClones(); renderConfigColaboradoras(); renderAprovacoes(); renderUsuarios();
+    renderConfigClones(); renderConfigColaboradoras(); renderAprovacoes(); renderSolicitacoesUpgrade(); renderUsuarios();
     Promise.all([carregarConfig(), carregarUsuarios()]).then(()=>{
-      renderConfigClones(); renderConfigColaboradoras(); renderAprovacoes(); renderUsuarios(); atualizarOpcoesClone();
+      renderConfigClones(); renderConfigColaboradoras(); renderAprovacoes(); renderSolicitacoesUpgrade(); renderUsuarios(); atualizarOpcoesClone();
     });
   }
 }
@@ -1482,6 +1542,7 @@ function renderTudo(){
     renderConfigClones();
     renderConfigColaboradoras();
     renderAprovacoes();
+    renderSolicitacoesUpgrade();
     renderUsuarios();
   }
 }
