@@ -1071,7 +1071,7 @@ function atualizarOpcoesClone(){
 // junto do número (ex.: número 30 vira 30.P). Qualquer outro clone usa
 // o número normal.
 function resolverNumeroColaboradora(numero, clone){
-  const ehKF = (clone||'').trim().toUpperCase().startsWith('KF');
+  const ehKF = (clone||'').trim().toUpperCase().includes('KF');
   return ehKF ? (numero+'.P') : numero;
 }
 
