@@ -276,7 +276,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 
       <div class="g3" style="margin-bottom:10px;">
         <div class="field"><label>Clone</label>
-          <select id="f-clone" required disabled>
+          <select id="f-clone" required disabled onchange="atualizarNomeColaboradora()">
             <option value="">Selecione a unidade primeiro</option>
           </select>
         </div>
@@ -1067,13 +1067,30 @@ function atualizarOpcoesClone(){
   if(clones.includes(atual)) sel.value = atual;
 }
 
+// Clones que começam com "KF" usam a colaboradora cadastrada com ".P"
+// junto do número (ex.: número 30 vira 30.P). Qualquer outro clone usa
+// o número normal.
+function resolverNumeroColaboradora(numero, clone){
+  const ehKF = (clone||'').trim().toUpperCase().startsWith('KF');
+  return ehKF ? (numero+'.P') : numero;
+}
+
+function buscarNomeColaboradora(unidade, numero, clone){
+  if(!unidade || !numero) return '';
+  const numeroEfetivo = resolverNumeroColaboradora(numero, clone);
+  return (config.colaboradoras[unidade]||{})[numeroEfetivo] || '';
+}
+
 function atualizarNomeColaboradora(){
   const unidade = document.getElementById('f-unidade').value;
   const numero = document.getElementById('f-colaboradora').value.trim();
+  const clone = document.getElementById('f-clone').value;
   const disp = document.getElementById('colaboradora-nome-display');
   if(!unidade || !numero){ disp.textContent=''; return; }
-  const nome = (config.colaboradoras[unidade]||{})[numero];
-  disp.textContent = nome ? ('Nome: '+nome) : 'Colaboradora não cadastrada para esta unidade.';
+  const numeroEfetivo = resolverNumeroColaboradora(numero, clone);
+  const nome = (config.colaboradoras[unidade]||{})[numeroEfetivo];
+  const sufixo = numeroEfetivo!==numero ? ' (nº '+numeroEfetivo+')' : '';
+  disp.textContent = nome ? ('Nome: '+nome+sufixo) : ('Colaboradora não cadastrada para esta unidade'+sufixo+'.');
   disp.style.color = nome ? 'var(--gd)' : 'var(--rd)';
 }
 
@@ -1143,7 +1160,8 @@ async function salvarLancamento(e){
   const {enr, sob} = calcularTaxas(plantadas, mortas, enraizadas);
   const unidade = document.getElementById('f-unidade').value;
   const colaboradora = document.getElementById('f-colaboradora').value.trim();
-  const colaboradoraNome = (config.colaboradoras[unidade]||{})[colaboradora] || '';
+  const cloneSelecionado = document.getElementById('f-clone').value.trim();
+  const colaboradoraNome = buscarNomeColaboradora(unidade, colaboradora, cloneSelecionado);
 
   const registro = {
     data: document.getElementById('f-data').value,
@@ -1152,7 +1170,7 @@ async function salvarLancamento(e){
     cv: document.getElementById('f-cv').value,
     canteiro: document.getElementById('f-canteiro').value,
     colaboradora, colaboradoraNome,
-    clone: document.getElementById('f-clone').value.trim(),
+    clone: cloneSelecionado,
     plantio: document.getElementById('f-plantio').value,
     lote: document.getElementById('f-lote').value.trim(),
     plantadas, mortas, enraizadas,
