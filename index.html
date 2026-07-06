@@ -351,11 +351,6 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
           </button>
           <div class="multisel-panel" id="fi-clone-panel"></div>
         </div>
-        <label class="chk-label">
-          <input type="checkbox" id="fi-dunni" onchange="onToggleDunni()">
-          <span class="box"></span>
-          Apenas Dunni
-        </label>
       </div>
       <div class="field"><label>CV</label><select id="fi-cv" onchange="renderDashboard()"><option value="">Todos</option></select></div>
       <div class="field"><label>Canteiro</label><select id="fi-canteiro" onchange="renderDashboard()"><option value="">Todos</option></select></div>
@@ -1437,18 +1432,9 @@ document.addEventListener('click', (e)=>{
   if(wrap && !wrap.contains(e.target)) document.getElementById('fi-clone-panel').classList.remove('open');
 });
 
-function onToggleDunni(){
-  const dunni = document.getElementById('fi-dunni').checked;
-  document.getElementById('fi-clone-btn').classList.toggle('disabled', dunni);
-  document.getElementById('fi-clone-panel').classList.remove('open');
-  renderDashboard();
-}
-
 function limparFiltros(){
   ['fi-unidade','fi-avaliador','fi-colaboradora','fi-lote','fi-cv','fi-canteiro','fi-especie'].forEach(id=>document.getElementById(id).value='');
   clonesFiltroSelecionados = [];
-  document.getElementById('fi-dunni').checked = false;
-  document.getElementById('fi-clone-btn').classList.remove('disabled');
   renderClonePanel();
   document.getElementById('fi-data-ini').value='';
   document.getElementById('fi-data-fim').value='';
@@ -1460,8 +1446,7 @@ function getFiltrados(){
   const av = document.getElementById('fi-avaliador').value;
   const co = document.getElementById('fi-colaboradora').value;
   const lo = document.getElementById('fi-lote').value;
-  const dunniOnly = document.getElementById('fi-dunni').checked;
-  const clonesSelecionados = dunniOnly ? DUNNI_CLONES : clonesFiltroSelecionados;
+  const clonesSelecionados = clonesFiltroSelecionados;
   const cv = document.getElementById('fi-cv').value;
   const ct = document.getElementById('fi-canteiro').value;
   const especie = document.getElementById('fi-especie').value;
