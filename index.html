@@ -359,7 +359,15 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       </div>
       <div class="field"><label>CV</label><select id="fi-cv" onchange="renderDashboard()"><option value="">Todos</option></select></div>
       <div class="field"><label>Canteiro</label><select id="fi-canteiro" onchange="renderDashboard()"><option value="">Todos</option></select></div>
-      <div></div>
+      <div class="field"><label>Espécie</label>
+        <select id="fi-especie" onchange="renderDashboard()">
+          <option value="">Todas</option>
+          <option value="Dunni">Dunni</option>
+          <option value="Pinus">Pinus</option>
+          <option value="Quilaia">Quilaia</option>
+          <option value="Eucalipto">Eucalipto</option>
+        </select>
+      </div>
     </div>
     <div class="g3">
       <div class="field"><label>Data início</label><input type="date" id="fi-data-ini" onchange="renderDashboard()"></div>
@@ -502,6 +510,18 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const UNIDADES = ['UBR','UBN','UTB','UES','UBA'];
 const DUNNI_CLONES = ['42285','K1103','4707','6201','8801'];
+
+// Classifica o clone em uma espécie, na seguinte ordem de prioridade:
+// 1) está na lista de clones Dunni  2) nome contém "KF" → Pinus
+// 3) nome contém "Quilaia" → Quilaia  4) qualquer outro → Eucalipto
+function getEspecie(clone){
+  const c = (clone||'').trim();
+  if(DUNNI_CLONES.includes(c)) return 'Dunni';
+  const cUpper = c.toUpperCase();
+  if(cUpper.includes('KF')) return 'Pinus';
+  if(cUpper.includes('QUILAIA')) return 'Quilaia';
+  return 'Eucalipto';
+}
 let db = [];
 let config = {clones:{}, colaboradoras:{}};
 UNIDADES.forEach(u=>{ config.clones[u] = []; config.colaboradoras[u] = {}; });
@@ -1089,8 +1109,7 @@ function atualizarNomeColaboradora(){
   if(!unidade || !numero){ disp.textContent=''; return; }
   const numeroEfetivo = resolverNumeroColaboradora(numero, clone);
   const nome = (config.colaboradoras[unidade]||{})[numeroEfetivo];
-  const sufixo = numeroEfetivo!==numero ? ' (nº '+numeroEfetivo+')' : '';
-  disp.textContent = nome ? ('Nome: '+nome+sufixo) : ('Colaboradora não cadastrada para esta unidade'+sufixo+'.');
+  disp.textContent = nome ? ('Nome: '+nome) : 'Colaboradora não cadastrada para esta unidade.';
   disp.style.color = nome ? 'var(--gd)' : 'var(--rd)';
 }
 
@@ -1426,7 +1445,7 @@ function onToggleDunni(){
 }
 
 function limparFiltros(){
-  ['fi-unidade','fi-avaliador','fi-colaboradora','fi-lote','fi-cv','fi-canteiro'].forEach(id=>document.getElementById(id).value='');
+  ['fi-unidade','fi-avaliador','fi-colaboradora','fi-lote','fi-cv','fi-canteiro','fi-especie'].forEach(id=>document.getElementById(id).value='');
   clonesFiltroSelecionados = [];
   document.getElementById('fi-dunni').checked = false;
   document.getElementById('fi-clone-btn').classList.remove('disabled');
@@ -1445,6 +1464,7 @@ function getFiltrados(){
   const clonesSelecionados = dunniOnly ? DUNNI_CLONES : clonesFiltroSelecionados;
   const cv = document.getElementById('fi-cv').value;
   const ct = document.getElementById('fi-canteiro').value;
+  const especie = document.getElementById('fi-especie').value;
   const dIni = document.getElementById('fi-data-ini').value;
   const dFim = document.getElementById('fi-data-fim').value;
 
@@ -1456,6 +1476,7 @@ function getFiltrados(){
     if(clonesSelecionados.length && !clonesSelecionados.includes(r.clone)) return false;
     if(cv && String(r.cv)!==cv) return false;
     if(ct && String(r.canteiro)!==ct) return false;
+    if(especie && getEspecie(r.clone)!==especie) return false;
     if(dIni && r.data<dIni) return false;
     if(dFim && r.data>dFim) return false;
     return true;
