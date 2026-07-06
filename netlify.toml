@@ -1,0 +1,46 @@
+# ═══════════════════════════════════════════════════════════════
+# Configuração do Netlify para o Monitoramento de Enraizamento
+# Coloque este arquivo na RAIZ do site (mesma pasta do index.html)
+# ═══════════════════════════════════════════════════════════════
+
+# Força HTTPS: qualquer acesso via http:// é redirecionado para https://
+# (o Netlify já serve HTTPS por padrão, isso é uma camada extra de garantia)
+[[redirects]]
+  from = "http://*"
+  to = "https://:splat"
+  status = 301
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Content-Security-Policy: só permite carregar scripts/estilos/fontes
+    # do próprio site e do Supabase (para as chamadas de API) e do Google
+    # Fonts (para a tipografia). Bloqueia scripts vindos de qualquer outro
+    # domínio (ex.: alguém tentar carregar um <script src="evil.com">).
+    #
+    # OBS: o app usa muitos atributos onclick="..." no HTML, então o
+    # script-src precisa incluir 'unsafe-inline' para eles continuarem
+    # funcionando. Isso significa que a CSP não bloqueia 100% de um XSS
+    # (se um dia um escape de sanitização passar despercebido, um script
+    # injetado ainda rodaria) — mas continua bloqueando a técnica mais
+    # comum de exfiltração, que é carregar um script de um domínio externo.
+    # Para fechar esse último ponto seria preciso reescrever os onclick
+    # para addEventListener, o que é uma refatoração maior.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://lhqurcddiycmacojvfnh.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+    # Força HTTPS no navegador por 1 ano, incluindo subdomínios
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+    # Impede que o site seja carregado dentro de um <iframe> em outro site
+    # (proteção contra clickjacking)
+    X-Frame-Options = "DENY"
+
+    # Impede que o navegador tente "adivinhar" o tipo de um arquivo
+    X-Content-Type-Options = "nosniff"
+
+    # Controla quanta informação de referrer é enviada para outros sites
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # Desativa APIs de navegador que este app não usa
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"

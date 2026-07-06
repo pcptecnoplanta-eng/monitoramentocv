@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoramento — Enraizamento de Mudas Clonais</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="libs/chart.umd.js"></script>
+<script src="libs/xlsx.full.min.js"></script>
+<script src="libs/supabase.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --gd:#009146;--gm:#76B846;--gl:#EAF3DE;--gll:#f4faed;
+  --ad:#BA7517;--al:#FAEEDA;
+  --rd:#A32D2D;--rl:#FCEBEB;
+  --bd:#185FA5;--bl:#E6F1FB;
+  --yd:#444441;--ym:#888780;--yl:#F1EFE8;--yll:#fafaf8;
+  --bg:#f4f3ef;--sf:#fff;--br:#D3D1C7;--brl:#ECEAE3;
+  --tx:#2C2C2A;--txm:#888780;
+  --fn:'IBM Plex Sans',sans-serif;--mo:'IBM Plex Mono',monospace;
+  --r:8px;--rl2:12px;
+}
+body{font-family:var(--fn);background:var(--bg);color:var(--tx);min-height:100vh;font-size:14px;line-height:1.5;}
+header{background:var(--gd);color:#fff;padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;border-bottom:3px solid var(--gm);min-height:64px;position:sticky;top:0;z-index:100;}
+header h1{font-size:13px;font-weight:600;letter-spacing:.02em;line-height:1.3;}
+header p{font-size:10px;opacity:.6;font-family:var(--mo);margin-top:1px;}
+.hstat{text-align:right;}.hstat strong{font-size:16px;font-family:var(--mo);display:block;line-height:1.2;}
+.hstat p{font-size:9px;opacity:.6;text-transform:uppercase;letter-spacing:.05em;}
+.hs{display:flex;align-items:center;gap:18px;}
+nav{background:var(--sf);border-bottom:1px solid var(--brl);padding:0 1.5rem;display:flex;position:sticky;top:64px;z-index:99;}
+.nt{padding:11px 18px;border:none;background:transparent;font-family:var(--fn);font-size:13px;font-weight:500;cursor:pointer;color:var(--txm);border-bottom:3px solid transparent;margin-bottom:-1px;transition:color .15s;}
+.nt.active{color:var(--gm);border-bottom-color:var(--gm);}
+.page{display:none;padding:1.25rem 1.5rem 4rem;max-width:1200px;margin:0 auto;}
+.page.active{display:block;}
+.card{background:var(--sf);border:1px solid var(--brl);border-radius:var(--rl2);padding:1.25rem;margin-bottom:1rem;}
+.ct{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--txm);margin-bottom:.9rem;}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1rem;}
+.metric{background:var(--sf);border:1px solid var(--brl);border-radius:var(--r);padding:.875rem 1rem;}
+.ml{font-size:11px;color:var(--txm);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
+.mv{font-size:22px;font-weight:600;font-family:var(--mo);line-height:1.1;}
+.mv.g{color:var(--gd);}.mv.b{color:var(--bd);}
+.ms{font-size:11px;color:var(--txm);margin-top:2px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+@media(max-width:640px){
+  .g3,.g4{grid-template-columns:1fr 1fr;}
+  .g2{grid-template-columns:1fr;}
+  header{padding:.625rem 1rem;min-height:56px;}
+  header h1{font-size:11px;}
+  header p{display:none;}
+  .hstat strong{font-size:14px;}
+  .page{padding:1rem .875rem 4rem;}
+}
+.field{display:flex;flex-direction:column;gap:4px;}
+label{font-size:11px;color:var(--txm);font-weight:500;letter-spacing:.03em;text-transform:uppercase;}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--br);border-radius:var(--r);font-family:var(--fn);font-size:13px;color:var(--tx);background:var(--sf);transition:border-color .15s;outline:none;-webkit-appearance:none;appearance:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--gm);box-shadow:0 0 0 3px rgba(118,184,70,.15);}
+input[type=number]{-moz-appearance:textfield;}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+textarea{resize:vertical;min-height:70px;}
+input.err,select.err{border-color:var(--rd);box-shadow:0 0 0 3px rgba(163,45,45,.1);}
+.warn-msg{font-size:11px;color:var(--rd);font-weight:500;margin-top:2px;display:none;}
+.warn-msg.visible{display:block;}
+.btn{padding:9px 20px;border-radius:var(--r);font-family:var(--fn);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:1px solid transparent;}
+.bp{background:var(--gm);color:#fff;border-color:var(--gm);}.bp:hover{background:var(--gd);}
+.bs{background:transparent;color:var(--tx);border-color:var(--br);}.bs:hover{background:var(--yl);}
+.be{background:transparent;color:var(--bd);border-color:var(--bd);}.be:hover{background:var(--bl);}
+.bd2{background:transparent;color:var(--rd);border-color:var(--rd);padding:5px 12px;font-size:11px;}.bd2:hover{background:var(--rl);}
+.bedit{background:transparent;color:var(--ad);border-color:var(--ad);padding:5px 12px;font-size:11px;}.bedit:hover{background:var(--al);}
+.actions{display:flex;gap:8px;margin-top:1.25rem;flex-wrap:wrap;}
+.edit-banner{display:none;background:var(--al);border:1px solid var(--ad);border-radius:var(--r);padding:10px 14px;margin-bottom:1rem;font-size:13px;color:var(--ad);font-weight:500;align-items:center;justify-content:space-between;gap:8px;}
+.edit-banner.visible{display:flex;}
+.rates{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:1rem 0;}
+.rate-box{border-radius:var(--r);padding:.9rem 1rem;border:1px solid;}
+.rate-box.re{background:var(--gll);border-color:var(--gm);}
+.rate-box.rs{background:var(--bl);border-color:var(--bd);}
+.rate-box .rl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+.rate-box.re .rl{color:var(--gd);}
+.rate-box.rs .rl{color:var(--bd);}
+.rate-box .rv{font-size:26px;font-weight:600;font-family:var(--mo);}
+.rate-box.re .rv{color:var(--gd);}
+.rate-box.rs .rv{color:var(--bd);}
+.ltb{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:.875rem;}
+.lc{font-size:12px;color:var(--txm);font-family:var(--mo);}
+.xb{display:flex;gap:7px;flex-wrap:wrap;}
+.tw{overflow-x:auto;}
+.tw::-webkit-scrollbar{height:14px;}
+.tw::-webkit-scrollbar-track{background:var(--yl);border-radius:8px;}
+.tw::-webkit-scrollbar-thumb{background:var(--gm);border-radius:8px;border:3px solid var(--yl);}
+.tw{scrollbar-width:thin;scrollbar-color:var(--gm) var(--yl);}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:900px;}
+th{text-align:left;padding:7px 10px;background:var(--yl);border:1px solid var(--brl);font-size:10px;font-weight:600;color:var(--txm);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+td{padding:6px 10px;border:1px solid var(--brl);vertical-align:top;white-space:nowrap;}
+tr:hover td{background:var(--yll);}
+.chart-wrap{position:relative;height:340px;}
+.empty{padding:2rem 1rem;text-align:center;color:var(--txm);font-size:13px;}
+footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--gl);color:var(--gd);border:1px solid var(--gm);border-radius:20px;padding:6px 6px 6px 13px;font-size:12px;font-weight:500;}
+.chip button{background:none;border:none;color:var(--gd);cursor:pointer;font-size:15px;line-height:1;padding:3px 7px;border-radius:50%;}
+.chip button:hover{background:rgba(0,145,70,.15);}
+.inline-add{display:flex;gap:8px;}
+.inline-add input{flex:1;}
+.inline-add .btn{white-space:nowrap;}
+
+/* ── HEADER USER ── */
+.hs-user{text-align:right;}
+.hs-user-name{font-size:12px;font-weight:600;line-height:1.2;}
+.hs-user-role{font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:.05em;}
+
+/* ── AUTH ── */
+#auth-screen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center;padding:1rem;}
+.auth-box{background:var(--sf);border:1px solid var(--brl);border-radius:16px;padding:2rem 2.25rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.08);}
+.auth-logo{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gm);margin-bottom:.25rem;}
+.auth-title{font-size:20px;font-weight:700;color:var(--gd);margin-bottom:.15rem;}
+.auth-sub{font-size:12px;color:var(--txm);margin-bottom:1.5rem;}
+.auth-field{display:flex;flex-direction:column;gap:4px;margin-bottom:.875rem;}
+.auth-field label{font-size:11px;font-weight:600;color:var(--txm);text-transform:uppercase;letter-spacing:.04em;}
+.auth-field input,.auth-field select{padding:10px 12px;border:1px solid var(--br);border-radius:8px;font-family:var(--fn);font-size:13px;background:var(--sf);color:var(--tx);outline:none;transition:border-color .15s;}
+.auth-field input:focus,.auth-field select:focus{border-color:var(--gm);box-shadow:0 0 0 3px rgba(118,184,70,.15);}
+.auth-btn{width:100%;padding:11px;border:none;border-radius:8px;font-family:var(--fn);font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;margin-top:.5rem;}
+.auth-btn.primary{background:var(--gm);color:#fff;}.auth-btn.primary:hover{background:var(--gd);}
+.auth-btn.ghost{background:transparent;color:var(--gm);font-size:12px;margin-top:.25rem;text-decoration:underline;cursor:pointer;border:none;width:100%;padding:6px;}
+.auth-divider{text-align:center;font-size:11px;color:var(--txm);margin:.5rem 0;}
+.auth-error{background:var(--rl);color:var(--rd);border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:.75rem;display:none;}
+.auth-success{background:var(--gl);color:var(--gd);border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:.75rem;display:none;}
+#auth-pending-screen{position:fixed;inset:0;background:var(--bg);z-index:998;display:none;align-items:center;justify-content:center;padding:1rem;}
+
+/* ── CUSTOM CHECKBOX ── */
+.chk-label{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:12px;color:var(--txm);cursor:pointer;text-transform:none;font-weight:500;letter-spacing:normal;}
+.chk-label input{display:none;}
+.chk-label .box{width:16px;height:16px;flex:0 0 16px;border:1.5px solid var(--br);border-radius:4px;background:#fff;position:relative;transition:background .15s,border-color .15s;}
+.chk-label input:checked + .box{background:var(--gm);border-color:var(--gm);}
+.chk-label input:checked + .box::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+.chk-label input:disabled + .box{opacity:.5;cursor:not-allowed;}
+
+/* ── MULTISELECT DROPDOWN (Clone) ── */
+.multisel{position:relative;}
+.multisel-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--br);border-radius:var(--r);background:var(--sf);font-family:var(--fn);font-size:13px;color:var(--tx);cursor:pointer;text-align:left;}
+.multisel-btn:hover{border-color:var(--gm);}
+.multisel-btn.disabled{opacity:.5;cursor:not-allowed;background:var(--yl);}
+.multisel-btn span.lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.multisel-btn .arrow{color:var(--txm);font-size:10px;flex:0 0 auto;}
+.multisel-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--sf);border:1px solid var(--br);border-radius:var(--r);box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;z-index:50;padding:6px;}
+.multisel-panel.open{display:block;}
+.multisel-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;cursor:pointer;}
+.multisel-opt:hover{background:var(--yl);}
+.multisel-opt input{display:none;}
+.multisel-opt .box{width:15px;height:15px;flex:0 0 15px;border:1.5px solid var(--br);border-radius:4px;background:#fff;position:relative;}
+.multisel-opt input:checked + .box{background:var(--gm);border-color:var(--gm);}
+.multisel-opt input:checked + .box::after{content:'';position:absolute;left:3px;top:0px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+.multisel-empty{padding:8px;font-size:12px;color:var(--txm);text-align:center;}
+</style>
+</head>
+<body>
+
+<!-- ══════════ AUTH SCREEN ══════════ -->
+<div id="auth-screen">
+  <!-- LOGIN PANEL -->
+  <div class="auth-box" id="auth-login-box">
+    <div class="auth-logo">TECNOPLANTA</div>
+    <div class="auth-title">Monitoramento</div>
+    <div class="auth-sub">Enraizamento de Mudas Clonais</div>
+    <div class="auth-error" id="login-error"></div>
+    <form onsubmit="event.preventDefault();doLogin()" autocomplete="on">
+      <div class="auth-field"><label>Email</label><input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username"></div>
+      <div class="auth-field"><label>Senha</label><input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password"></div>
+      <button type="submit" class="auth-btn primary">Entrar</button>
+    </form>
+    <div class="auth-divider">ou</div>
+    <button class="auth-btn ghost" onclick="showAuthPanel('register')">Criar conta</button>
+    <button class="auth-btn ghost" onclick="showAuthPanel('forgot')">Esqueci minha senha</button>
+  </div>
+
+  <!-- REGISTER PANEL -->
+  <div class="auth-box" id="auth-register-box" style="display:none;">
+    <div class="auth-logo">TECNOPLANTA</div>
+    <div class="auth-title">Criar conta</div>
+    <div class="auth-sub">Preencha os dados para solicitar acesso.</div>
+    <div class="auth-error" id="register-error"></div>
+    <div class="auth-success" id="register-success"></div>
+    <form onsubmit="event.preventDefault();doRegister()" autocomplete="on">
+      <div class="auth-field"><label>Nome completo</label><input type="text" id="reg-nome" placeholder="Seu nome" autocomplete="name"></div>
+      <div class="auth-field"><label>Email</label><input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="username"></div>
+      <div class="auth-field"><label>Senha</label><input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+      <div class="auth-field"><label>Confirmar senha</label><input type="password" id="reg-senha2" placeholder="Repita a senha" autocomplete="new-password"></div>
+      <div class="auth-field">
+        <label>Nível de acesso solicitado</label>
+        <select id="reg-permissao">
+          <option value="visualizador">Visualizador — somente leitura</option>
+          <option value="editor">Editor — pode lançar e editar dados</option>
+        </select>
+      </div>
+      <button type="submit" class="auth-btn primary">Solicitar acesso</button>
+    </form>
+    <button class="auth-btn ghost" onclick="showAuthPanel('login')">← Voltar ao login</button>
+  </div>
+
+  <!-- FORGOT PANEL -->
+  <div class="auth-box" id="auth-forgot-box" style="display:none;">
+    <div class="auth-logo">TECNOPLANTA</div>
+    <div class="auth-title">Redefinir senha</div>
+    <div class="auth-sub">Como o acesso é feito localmente neste dispositivo, a redefinição precisa ser feita por um administrador.</div>
+    <div class="auth-error" id="forgot-error"></div>
+    <div class="auth-success" id="forgot-success"></div>
+    <div class="auth-field"><label>Email</label><input type="email" id="forgot-email" placeholder="seu@email.com"></div>
+    <button class="auth-btn primary" onclick="doForgotPassword()">Solicitar redefinição</button>
+    <button class="auth-btn ghost" onclick="showAuthPanel('login')">← Voltar ao login</button>
+  </div>
+</div>
+
+<!-- ══════════ PENDING SCREEN ══════════ -->
+<div id="auth-pending-screen">
+  <div class="auth-box" style="text-align:center;">
+    <div class="auth-logo">TECNOPLANTA</div>
+    <div class="auth-title">Acesso pendente</div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:1.5rem;">Sua solicitação de acesso está aguardando aprovação do administrador. Você será notificado quando for liberado.</div>
+    <button class="auth-btn ghost" onclick="doLogout()" style="color:var(--txm);">Sair</button>
+  </div>
+</div>
+
+<div id="app-content" style="display:none;">
+<header>
+  <div>
+    <h1>MONITORAMENTO DE ENRAIZAMENTO</h1>
+    <p>Mudas Clonais · Viveiro</p>
+  </div>
+  <div class="hs">
+    <div class="hstat"><strong id="hd-total">0</strong><p>Lançamentos</p></div>
+    <div class="hs-user">
+      <div class="hs-user-name" id="hd-user-name">—</div>
+      <div class="hs-user-role" id="hd-user-role">—</div>
+    </div>
+    <button class="btn" style="padding:7px 16px;font-size:12px;background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.4);" onclick="doLogout()">Sair</button>
+  </div>
+</header>
+
+<nav>
+  <button class="nt active" data-page="page-lancamento" onclick="trocarAba('page-lancamento',this)">Lançamento</button>
+  <button class="nt" data-page="page-dashboard" onclick="trocarAba('page-dashboard',this)">Dashboard</button>
+  <button class="nt" data-page="page-config" onclick="trocarAba('page-config',this)">Configurações</button>
+</nav>
+
+<!-- ═══════════════ LANÇAMENTO ═══════════════ -->
+<div class="page active" id="page-lancamento">
+
+  <div class="card">
+    <div class="ct">Novo lançamento</div>
+
+    <div class="edit-banner" id="edit-banner">
+      <span>Editando lançamento — as alterações substituirão o registro original.</span>
+      <button class="btn bs" style="padding:4px 12px;font-size:11px;" onclick="cancelarEdicao()">Cancelar edição</button>
+    </div>
+
+    <form id="form-lanc" onsubmit="return salvarLancamento(event)">
+      <div class="g3" style="margin-bottom:10px;">
+        <div class="field"><label>Data</label><input type="date" id="f-data" required></div>
+        <div class="field"><label>Unidade</label>
+          <select id="f-unidade" required onchange="atualizarOpcoesClone();atualizarNomeColaboradora();">
+            <option value="">Selecione...</option>
+            <option>UBR</option><option>UBN</option><option>UTB</option><option>UES</option><option>UBA</option>
+          </select>
+        </div>
+        <div class="field"><label>Avaliador</label><input type="text" id="f-avaliador" list="dl-avaliador" required></div>
+      </div>
+
+      <div class="g3" style="margin-bottom:10px;">
+        <div class="field"><label>CV</label><input type="number" id="f-cv" min="0" step="1" placeholder="Número" required></div>
+        <div class="field"><label>Canteiro</label><input type="number" id="f-canteiro" min="0" step="1" placeholder="Número" required></div>
+        <div class="field"><label>Nº da colaboradora</label>
+          <input type="text" id="f-colaboradora" list="dl-colaboradora" required oninput="atualizarNomeColaboradora()">
+          <div class="ms" id="colaboradora-nome-display"></div>
+        </div>
+      </div>
+
+      <div class="g3" style="margin-bottom:10px;">
+        <div class="field"><label>Clone</label>
+          <select id="f-clone" required disabled>
+            <option value="">Selecione a unidade primeiro</option>
+          </select>
+        </div>
+        <div class="field"><label>Data de plantio</label><input type="date" id="f-plantio" required></div>
+        <div class="field"><label>Lote</label><input type="text" id="f-lote" list="dl-lote" required></div>
+      </div>
+
+      <div class="g3" style="margin-bottom:6px;">
+        <div class="field"><label>Mudas plantadas</label><input type="number" id="f-plantadas" min="0" step="1" required oninput="atualizarTaxas()"></div>
+        <div class="field"><label>Mudas mortas</label><input type="number" id="f-mortas" min="0" step="1" required oninput="atualizarTaxas()"></div>
+        <div class="field"><label>Mudas enraizadas</label><input type="number" id="f-enraizadas" min="0" step="1" required oninput="atualizarTaxas()"></div>
+      </div>
+      <div class="warn-msg" id="warn-msg"></div>
+
+      <div class="rates">
+        <div class="rate-box re"><div class="rl">Taxa de enraizamento</div><div class="rv" id="rv-enr">–</div></div>
+        <div class="rate-box rs"><div class="rl">Taxa de sobrevivência</div><div class="rv" id="rv-sob">–</div></div>
+      </div>
+
+      <div class="field" style="margin-bottom:10px;">
+        <label>Observações</label>
+        <textarea id="f-obs" placeholder="Opcional"></textarea>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn bp" id="btn-salvar">Salvar lançamento</button>
+        <button type="button" class="btn bs" onclick="limparForm()">Limpar</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="ltb">
+      <div class="ct" style="margin-bottom:0;">Lançamentos registrados</div>
+      <div class="xb">
+        <span class="lc" id="lanc-count">0 registros</span>
+        <button class="btn be" style="padding:5px 12px;font-size:11px;" onclick="exportarExcel(db,'lancamentos_enraizamento')">Exportar Excel</button>
+      </div>
+    </div>
+    <div class="tw">
+      <table id="tabela-lanc">
+        <thead><tr>
+          <th>Data</th><th>Unidade</th><th>Avaliador</th><th>CV</th><th>Canteiro</th><th>Colaboradora</th>
+          <th>Clone</th><th>Data plantio</th><th>Lote</th><th>Plantadas</th><th>Mortas</th><th>Enraizadas</th>
+          <th>Enraiz. %</th><th>Sobrev. %</th><th>Obs.</th><th></th>
+        </tr></thead>
+        <tbody id="tbody-lanc"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty-lanc" style="display:none;">Nenhum lançamento registrado ainda.</div>
+  </div>
+</div>
+
+<!-- ═══════════════ DASHBOARD ═══════════════ -->
+<div class="page" id="page-dashboard">
+
+  <div class="card">
+    <div class="ct">Filtros</div>
+    <div class="g4" style="margin-bottom:10px;">
+      <div class="field"><label>Unidade</label><select id="fi-unidade" onchange="renderDashboard()"><option value="">Todas</option></select></div>
+      <div class="field"><label>Avaliador</label><select id="fi-avaliador" onchange="renderDashboard()"><option value="">Todos</option></select></div>
+      <div class="field"><label>Colaboradora</label><select id="fi-colaboradora" onchange="renderDashboard()"><option value="">Todas</option></select></div>
+      <div class="field"><label>Lote</label><select id="fi-lote" onchange="renderDashboard()"><option value="">Todos</option></select></div>
+    </div>
+    <div class="g4" style="margin-bottom:10px;">
+      <div class="field">
+        <label>Clone</label>
+        <div class="multisel" id="fi-clone-wrap">
+          <button type="button" class="multisel-btn" id="fi-clone-btn" onclick="toggleCloneDropdown(event)">
+            <span class="lbl" id="fi-clone-label">Todos</span>
+            <span class="arrow">▾</span>
+          </button>
+          <div class="multisel-panel" id="fi-clone-panel"></div>
+        </div>
+        <label class="chk-label">
+          <input type="checkbox" id="fi-dunni" onchange="onToggleDunni()">
+          <span class="box"></span>
+          Apenas Dunni
+        </label>
+      </div>
+      <div class="field"><label>CV</label><select id="fi-cv" onchange="renderDashboard()"><option value="">Todos</option></select></div>
+      <div class="field"><label>Canteiro</label><select id="fi-canteiro" onchange="renderDashboard()"><option value="">Todos</option></select></div>
+      <div></div>
+    </div>
+    <div class="g3">
+      <div class="field"><label>Data início</label><input type="date" id="fi-data-ini" onchange="renderDashboard()"></div>
+      <div class="field"><label>Data fim</label><input type="date" id="fi-data-fim" onchange="renderDashboard()"></div>
+      <div class="field" style="justify-content:flex-end;"><button class="btn bs" onclick="limparFiltros()">Limpar filtros</button></div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="ml">Lançamentos</div><div class="mv" id="db-count">0</div></div>
+    <div class="metric"><div class="ml">Mudas plantadas</div><div class="mv" id="db-plantadas">0</div></div>
+    <div class="metric"><div class="ml">Mudas mortas</div><div class="mv" id="db-mortas">0</div></div>
+    <div class="metric"><div class="ml">Mudas enraizadas</div><div class="mv" id="db-enraizadas">0</div></div>
+    <div class="metric"><div class="ml">Taxa enraizamento méd.</div><div class="mv g" id="db-taxa-enr">–</div></div>
+    <div class="metric"><div class="ml">Taxa sobrevivência méd.</div><div class="mv b" id="db-taxa-sob">–</div></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">Enraizamento e sobrevivência ao longo do tempo</div>
+    <div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div>
+    <div class="empty" id="empty-chart" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
+  </div>
+
+  <div class="card">
+    <div class="ltb">
+      <div class="ct" style="margin-bottom:0;">Registros filtrados</div>
+      <div class="xb">
+        <span class="lc" id="db-tab-count">0 registros</span>
+        <button class="btn be" style="padding:5px 12px;font-size:11px;" onclick="exportarExcel(getFiltrados(),'dashboard_enraizamento')">Exportar Excel</button>
+      </div>
+    </div>
+    <div class="tw">
+      <table id="tabela-dash">
+        <thead><tr>
+          <th>Data</th><th>Unidade</th><th>Avaliador</th><th>CV</th><th>Canteiro</th><th>Colaboradora</th>
+          <th>Clone</th><th>Data plantio</th><th>Lote</th><th>Plantadas</th><th>Mortas</th><th>Enraizadas</th>
+          <th>Enraiz. %</th><th>Sobrev. %</th>
+        </tr></thead>
+        <tbody id="tbody-dash"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty-dash" style="display:none;">Nenhum registro encontrado.</div>
+  </div>
+</div>
+
+<!-- ═══════════════ CONFIGURAÇÕES ═══════════════ -->
+<div class="page" id="page-config">
+
+  <div class="card">
+    <div class="ct">Aprovações pendentes</div>
+    <div class="tw">
+      <table id="cfg-aprovacoes-tabela" style="min-width:0;">
+        <thead><tr><th>Nome</th><th>Email</th><th>Acesso solicitado</th><th></th></tr></thead>
+        <tbody id="cfg-aprovacoes-tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="cfg-aprovacoes-empty" style="display:none;">Nenhuma solicitação pendente.</div>
+  </div>
+
+  <div class="card">
+    <div class="ct">Usuários cadastrados</div>
+    <div class="tw">
+      <table id="cfg-usuarios-tabela" style="min-width:0;">
+        <thead><tr><th>Nome</th><th>Email</th><th>Nível de acesso</th><th></th></tr></thead>
+        <tbody id="cfg-usuarios-tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="cfg-usuarios-empty" style="display:none;">Nenhum usuário cadastrado.</div>
+  </div>
+
+  <div class="card">
+    <div class="ct">Clones por unidade</div>
+    <div class="g2" style="margin-bottom:12px;">
+      <div class="field"><label>Unidade</label>
+        <select id="cfg-clone-unidade" onchange="renderConfigClones()">
+          <option value="UBR">UBR</option><option value="UBN">UBN</option><option value="UTB">UTB</option><option value="UES">UES</option><option value="UBA">UBA</option>
+        </select>
+      </div>
+      <div class="field"><label>Novo clone</label>
+        <div class="inline-add">
+          <input type="text" id="cfg-clone-novo" placeholder="Nome do clone" onkeydown="if(event.key==='Enter'){event.preventDefault();adicionarClone();}">
+          <button type="button" class="btn bp" onclick="adicionarClone()">Adicionar</button>
+        </div>
+      </div>
+    </div>
+    <div id="cfg-clone-lista" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    <div class="empty" id="cfg-clone-empty" style="display:none;">Nenhum clone cadastrado para esta unidade.</div>
+  </div>
+
+  <div class="card">
+    <div class="ct">Colaboradoras por unidade</div>
+    <div class="g3" style="margin-bottom:12px;">
+      <div class="field"><label>Unidade</label>
+        <select id="cfg-colab-unidade" onchange="renderConfigColaboradoras()">
+          <option value="UBR">UBR</option><option value="UBN">UBN</option><option value="UTB">UTB</option><option value="UES">UES</option><option value="UBA">UBA</option>
+        </select>
+      </div>
+      <div class="field"><label>Nº da colaboradora</label><input type="text" id="cfg-colab-numero" placeholder="Número"></div>
+      <div class="field"><label>Nome</label>
+        <div class="inline-add">
+          <input type="text" id="cfg-colab-nome" placeholder="Nome completo" onkeydown="if(event.key==='Enter'){event.preventDefault();adicionarColaboradora();}">
+          <button type="button" class="btn bp" onclick="adicionarColaboradora()">Adicionar</button>
+        </div>
+      </div>
+    </div>
+    <div class="tw">
+      <table id="cfg-colab-tabela" style="min-width:0;">
+        <thead><tr><th>Número</th><th>Nome</th><th></th></tr></thead>
+        <tbody id="cfg-colab-tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="cfg-colab-empty" style="display:none;">Nenhuma colaboradora cadastrada para esta unidade.</div>
+  </div>
+</div>
+
+<datalist id="dl-avaliador"></datalist>
+<datalist id="dl-colaboradora"></datalist>
+<datalist id="dl-clone"></datalist>
+<datalist id="dl-lote"></datalist>
+
+<footer>Monitoramento de Enraizamento · dados sincronizados na nuvem (Supabase)</footer>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://lhqurcddiycmacojvfnh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_XxmFEX9ermfqf4_shV3Dvw_d4VzH-uK';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const UNIDADES = ['UBR','UBN','UTB','UES','UBA'];
+const DUNNI_CLONES = ['42285','K1103','4707','6201','8801'];
+let db = [];
+let config = {clones:{}, colaboradoras:{}};
+UNIDADES.forEach(u=>{ config.clones[u] = []; config.colaboradoras[u] = {}; });
+let editandoId = null;
+let chartEvolucao = null;
+
+function avisoErroSupabase(acao, error){
+  console.error(acao, error);
+  alert('Erro ao '+acao+' no Supabase: '+(error?.message||'verifique sua conexão.'));
+}
+
+// ── MAPEAMENTO DE LINHAS (snake_case no banco ↔ camelCase no app) ────────
+// ── SANITIZAÇÃO DE SAÍDA (prevenção de XSS) ──────────────────────────────
+// Qualquer texto vindo do banco (nomes, observações, clones, etc.) passa por
+// aqui antes de ser inserido no HTML, para impedir que alguém injete tags
+// ou scripts digitando algo como <script> num campo de texto.
+function escapeHtml(valor){
+  if(valor===null || valor===undefined) return '';
+  return String(valor).replace(/[&<>"']/g, (c)=>({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+
+function rowParaRegistro(row){
+  return {
+    id: row.id, data: row.data, unidade: row.unidade, avaliador: row.avaliador,
+    cv: row.cv, canteiro: row.canteiro, colaboradora: row.colaboradora, colaboradoraNome: row.colaboradora_nome,
+    clone: row.clone, plantio: row.plantio, lote: row.lote,
+    plantadas: row.plantadas, mortas: row.mortas, enraizadas: row.enraizadas,
+    taxaEnraizamento: row.taxa_enraizamento, taxaSobrevivencia: row.taxa_sobrevivencia,
+    obs: row.obs, criadoEm: row.criado_em
+  };
+}
+function registroParaRow(r){
+  return {
+    data: r.data, unidade: r.unidade, avaliador: r.avaliador, cv: r.cv, canteiro: r.canteiro,
+    colaboradora: r.colaboradora, colaboradora_nome: r.colaboradoraNome, clone: r.clone,
+    plantio: r.plantio, lote: r.lote, plantadas: r.plantadas, mortas: r.mortas, enraizadas: r.enraizadas,
+    taxa_enraizamento: r.taxaEnraizamento, taxa_sobrevivencia: r.taxaSobrevivencia, obs: r.obs
+  };
+}
+
+// ── CARREGAMENTO REMOTO ──────────────────────────────────
+async function carregarLancamentos(){
+  const {data, error} = await sb.from('lancamentos').select('*').order('data',{ascending:false}).order('criado_em',{ascending:false});
+  if(error){ avisoErroSupabase('carregar lançamentos', error); return; }
+  db = (data||[]).map(rowParaRegistro);
+}
+
+async function carregarConfig(){
+  const [{data:clonesRows, error:e1}, {data:colabRows, error:e2}] = await Promise.all([
+    sb.from('clones_unidade').select('*'),
+    sb.from('colaboradoras_unidade').select('*')
+  ]);
+  if(e1) avisoErroSupabase('carregar clones', e1);
+  if(e2) avisoErroSupabase('carregar colaboradoras', e2);
+  config = {clones:{}, colaboradoras:{}};
+  UNIDADES.forEach(u=>{ config.clones[u] = []; config.colaboradoras[u] = {}; });
+  (clonesRows||[]).forEach(r=>{ if(config.clones[r.unidade]) config.clones[r.unidade].push(r.clone); });
+  (colabRows||[]).forEach(r=>{ if(config.colaboradoras[r.unidade]) config.colaboradoras[r.unidade][r.numero] = r.nome; });
+}
+
+// ── AUDITORIA (logging de ações sensíveis) ──────────────────────
+// Falha silenciosa de propósito: um problema ao gravar o log nunca deve
+// travar a ação principal do usuário.
+async function registrarEvento(tipo, detalhe, emailUsuario){
+  try{
+    await sb.from('auditoria_eventos').insert({
+      tipo, detalhe: detalhe||null, email_usuario: emailUsuario||null
+    });
+  }catch(e){ console.warn('Falha ao registrar auditoria:', e); }
+}
+
+// Depois de recarregar a página, a sessão é restaurada pelo token — mas a
+// senha não fica guardada em lugar nenhum. Para qualquer ação de admin
+// (aprovar, remover, listar usuários...), pedimos a senha de novo aqui,
+// só uma vez por sessão de navegação, e ela é conferida no banco.
+async function garantirSenhaAdmin(){
+  if(usuarioAtualSenha) return true;
+  const senha = prompt('Por segurança, confirme sua senha de administrador para gerenciar usuários:');
+  if(!senha) return false;
+  const {data, error} = await sb.rpc('eh_admin_valido', {p_admin_email: usuarioAtual.email, p_admin_senha: senha});
+  if(error || !data){ alert('Senha incorreta.'); return false; }
+  usuarioAtualSenha = senha;
+  return true;
+}
+
+async function carregarUsuarios(){
+  if(!usuarioAtual || usuarioAtual.permissao!=='admin') return;
+  if(!(await garantirSenhaAdmin())) return;
+  const {data, error} = await sb.rpc('listar_usuarios', {
+    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha
+  });
+  if(error){ avisoErroSupabase('carregar usuários', error); return; }
+  usuarios = data || [];
+}
+
+// ── AUTENTICAÇÃO E PERMISSÕES ──────────────────────────────────
+const SESSION_KEY = 'enraizamento_sessao_v1';
+const ADMIN_EMAIL = 'gustavo.zelmikaitis@tecnoplanta.com.br';
+const NOMES_PERMISSAO = {admin:'Administrador', editor:'Editor', visualizador:'Visualizador'};
+
+// Limite simples de tentativas de login neste navegador (mitigação básica
+// no cliente). Isso NÃO substitui um rate limit de verdade no servidor —
+// alguém chamando a API diretamente (fora do app) não é freado por isso.
+const LOGIN_MAX_TENTATIVAS = 5;
+const LOGIN_BLOQUEIO_MS = 30000;
+
+let usuarios = [];
+let usuarioAtual = null;
+// Guardada só em memória (nunca em localStorage) enquanto a sessão de admin
+// dura, para autorizar as ações administrativas — nunca fica salva em disco.
+let usuarioAtualSenha = null;
+
+function normalizarEmail(e){ return (e||'').trim().toLowerCase(); }
+
+function showAuthPanel(qual){
+  document.getElementById('auth-login-box').style.display = qual==='login' ? 'block' : 'none';
+  document.getElementById('auth-register-box').style.display = qual==='register' ? 'block' : 'none';
+  document.getElementById('auth-forgot-box').style.display = qual==='forgot' ? 'block' : 'none';
+  ['login-error','register-error','register-success','forgot-error','forgot-success'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.style.display='none'; el.textContent=''; }
+  });
+}
+
+function loginBloqueadoAte(){
+  return parseInt(sessionStorage.getItem('login_bloqueado_ate')||'0', 10);
+}
+function registrarTentativaFalha(){
+  const n = parseInt(sessionStorage.getItem('login_tentativas')||'0', 10) + 1;
+  sessionStorage.setItem('login_tentativas', String(n));
+  if(n >= LOGIN_MAX_TENTATIVAS){
+    sessionStorage.setItem('login_bloqueado_ate', String(Date.now() + LOGIN_BLOQUEIO_MS));
+    sessionStorage.setItem('login_tentativas', '0');
+  }
+}
+function limparTentativasLogin(){
+  sessionStorage.removeItem('login_tentativas');
+  sessionStorage.removeItem('login_bloqueado_ate');
+}
+
+async function doLogin(){
+  const errBox = document.getElementById('login-error');
+  errBox.style.display = 'none';
+
+  const bloqueadoAte = loginBloqueadoAte();
+  if(bloqueadoAte > Date.now()){
+    const segundos = Math.ceil((bloqueadoAte - Date.now())/1000);
+    errBox.textContent = 'Muitas tentativas incorretas. Tente novamente em '+segundos+' segundos.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const email = normalizarEmail(document.getElementById('login-email').value);
+  const senha = document.getElementById('login-senha').value;
+  if(!email || !senha){
+    errBox.textContent = 'Informe email e senha.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const btn = document.querySelector('#auth-login-box button[type="submit"]');
+  btn.disabled = true;
+  try{
+    const {data, error} = await sb.rpc('autenticar_usuario', {p_email: email, p_senha: senha});
+    if(error){ avisoErroSupabase('fazer login', error); return; }
+
+    const usuario = Array.isArray(data) ? data[0] : data;
+    if(!usuario){
+      registrarTentativaFalha();
+      registrarEvento('login_falha', 'credenciais inválidas', email);
+      errBox.textContent = 'Email ou senha incorretos.';
+      errBox.style.display = 'block';
+      return;
+    }
+
+    limparTentativasLogin();
+    if(usuario.status === 'pendente'){
+      registrarEvento('login_pendente', null, email);
+      mostrarTelaPendente();
+      return;
+    }
+    usuarioAtualSenha = senha;
+    if(usuario.token) localStorage.setItem(SESSION_KEY, usuario.token);
+    registrarEvento('login_sucesso', null, email);
+    iniciarSessao(usuario);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function doRegister(){
+  const nome = document.getElementById('reg-nome').value.trim();
+  const email = normalizarEmail(document.getElementById('reg-email').value);
+  const senha = document.getElementById('reg-senha').value;
+  const senha2 = document.getElementById('reg-senha2').value;
+  const permissaoSolicitada = document.getElementById('reg-permissao').value;
+  const errBox = document.getElementById('register-error');
+  const okBox = document.getElementById('register-success');
+  errBox.style.display = 'none';
+  okBox.style.display = 'none';
+
+  if(!nome || !email || !senha || !senha2){
+    errBox.textContent = 'Preencha todos os campos.';
+    errBox.style.display = 'block';
+    return;
+  }
+  if(senha.length < 6){
+    errBox.textContent = 'A senha deve ter no mínimo 6 caracteres.';
+    errBox.style.display = 'block';
+    return;
+  }
+  if(senha !== senha2){
+    errBox.textContent = 'As senhas não coincidem.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const btn = document.querySelector('#auth-register-box button[type="submit"]');
+  btn.disabled = true;
+  try{
+    const {data, error} = await sb.rpc('registrar_usuario', {
+      p_nome: nome, p_email: email, p_senha: senha, p_permissao: permissaoSolicitada
+    });
+    if(error){
+      if(String(error.message||'').includes('email_ja_cadastrado')){
+        errBox.textContent = 'Já existe uma conta com este email.';
+      } else {
+        avisoErroSupabase('criar conta', error);
+        errBox.textContent = 'Não foi possível criar a conta.';
+      }
+      errBox.style.display = 'block';
+      return;
+    }
+
+    const novo = Array.isArray(data) ? data[0] : data;
+    registrarEvento('conta_criada', novo.permissao, email);
+
+    if(novo.permissao === 'admin'){
+      usuarioAtualSenha = senha;
+      if(novo.token) localStorage.setItem(SESSION_KEY, novo.token);
+      iniciarSessao(novo);
+      return;
+    }
+
+    okBox.textContent = 'Conta criada! Aguarde a aprovação de um administrador para acessar.';
+    okBox.style.display = 'block';
+    document.getElementById('reg-nome').value = '';
+    document.getElementById('reg-email').value = '';
+    document.getElementById('reg-senha').value = '';
+    document.getElementById('reg-senha2').value = '';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function doForgotPassword(){
+  const email = normalizarEmail(document.getElementById('forgot-email').value);
+  const errBox = document.getElementById('forgot-error');
+  const okBox = document.getElementById('forgot-success');
+  errBox.style.display = 'none';
+  okBox.style.display = 'none';
+  if(!email){
+    errBox.textContent = 'Informe seu email.';
+    errBox.style.display = 'block';
+    return;
+  }
+  okBox.textContent = 'Solicitação registrada. Peça a um administrador para redefinir sua senha em Configurações.';
+  okBox.style.display = 'block';
+}
+
+async function iniciarSessao(user){
+  usuarioAtual = user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('auth-pending-screen').style.display = 'none';
+  document.getElementById('app-content').style.display = 'block';
+
+  await Promise.all([
+    carregarLancamentos(),
+    carregarConfig(),
+    user.permissao==='admin' ? carregarUsuarios() : Promise.resolve()
+  ]);
+
+  aplicarPermissoes();
+  renderTudo();
+}
+
+function mostrarTelaPendente(){
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-content').style.display = 'none';
+  document.getElementById('auth-pending-screen').style.display = 'flex';
+}
+
+function doLogout(){
+  if(usuarioAtual) registrarEvento('logout', null, usuarioAtual.email);
+  const token = localStorage.getItem(SESSION_KEY);
+  if(token) sb.rpc('encerrar_sessao', {p_token: token}).catch(()=>{});
+  usuarioAtual = null;
+  usuarioAtualSenha = null;
+  localStorage.removeItem(SESSION_KEY);
+  document.getElementById('app-content').style.display = 'none';
+  document.getElementById('auth-pending-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  showAuthPanel('login');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-senha').value = '';
+}
+
+function aplicarPermissoes(){
+  const p = usuarioAtual.permissao;
+  const btnLanc = document.querySelector('.nt[data-page="page-lancamento"]');
+  const btnDash = document.querySelector('.nt[data-page="page-dashboard"]');
+  const btnCfg = document.querySelector('.nt[data-page="page-config"]');
+  btnLanc.style.display = (p==='admin' || p==='editor') ? '' : 'none';
+  btnDash.style.display = '';
+  btnCfg.style.display = (p==='admin') ? '' : 'none';
+
+  document.getElementById('hd-user-name').textContent = usuarioAtual.nome || usuarioAtual.email;
+  document.getElementById('hd-user-role').textContent = NOMES_PERMISSAO[p] || p;
+
+  const paginaInicial = (p==='admin' || p==='editor') ? 'page-lancamento' : 'page-dashboard';
+  trocarAba(paginaInicial, document.querySelector('.nt[data-page="'+paginaInicial+'"]'));
+
+  if(p==='admin'){ renderAprovacoes(); renderUsuarios(); }
+}
+
+// ── ADMIN: APROVAÇÕES E GESTÃO DE USUÁRIOS ──────────────────────────────
+// Todas as ações abaixo reenviam o email+senha do admin logado para o
+// banco, que confere a senha (com bcrypt) antes de executar qualquer
+// alteração — mesmo que alguém tente chamar essas funções diretamente
+// pela API, sem uma senha de admin válida a ação é recusada.
+function renderAprovacoes(){
+  const cont = document.getElementById('cfg-aprovacoes-tbody');
+  if(!cont) return;
+  const pendentes = usuarios.filter(u=>u.status==='pendente');
+  cont.innerHTML = pendentes.map(u=>`
+    <tr>
+      <td>${escapeHtml(u.nome)}</td><td>${escapeHtml(u.email)}</td><td>${escapeHtml(NOMES_PERMISSAO[u.permissao]||u.permissao)}</td>
+      <td><div style="display:flex;gap:6px;">
+        <button class="btn bp" style="padding:5px 12px;font-size:11px;" onclick="aprovarUsuario(${JSON.stringify(u.email)})">Aprovar</button>
+        <button class="btn bd2" onclick="recusarUsuario(${JSON.stringify(u.email)})">Recusar</button>
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('cfg-aprovacoes-empty').style.display = pendentes.length ? 'none' : 'block';
+  document.getElementById('cfg-aprovacoes-tabela').style.display = pendentes.length ? 'table' : 'none';
+}
+
+async function aprovarUsuario(email){
+  const {error} = await sb.rpc('aprovar_usuario', {
+    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
+  });
+  if(error){ avisoErroSupabase('aprovar usuário', error); return; }
+  registrarEvento('usuario_aprovado', email, usuarioAtual.email);
+  await carregarUsuarios();
+  renderAprovacoes();
+  renderUsuarios();
+}
+
+async function recusarUsuario(email){
+  if(!confirm('Recusar e excluir esta solicitação de acesso?')) return;
+  const {error} = await sb.rpc('recusar_usuario', {
+    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
+  });
+  if(error){ avisoErroSupabase('recusar usuário', error); return; }
+  registrarEvento('usuario_recusado', email, usuarioAtual.email);
+  await carregarUsuarios();
+  renderAprovacoes();
+}
+
+function renderUsuarios(){
+  const cont = document.getElementById('cfg-usuarios-tbody');
+  if(!cont) return;
+  const aprovados = usuarios.filter(u=>u.status==='aprovado').sort((a,b)=>a.nome.localeCompare(b.nome));
+  cont.innerHTML = aprovados.map(u=>{
+    const ehAdminFixo = u.email === ADMIN_EMAIL;
+    const permissaoSelect = ehAdminFixo
+      ? `<span style="color:var(--gd);font-weight:600;">Administrador</span>`
+      : `<select onchange="alterarPermissaoUsuario(${JSON.stringify(u.email)}, this.value)" style="padding:5px 8px;font-size:12px;">
+          <option value="visualizador" ${u.permissao==='visualizador'?'selected':''}>Visualizador</option>
+          <option value="editor" ${u.permissao==='editor'?'selected':''}>Editor</option>
+          <option value="admin" ${u.permissao==='admin'?'selected':''}>Administrador</option>
+        </select>`;
+    const acoes = ehAdminFixo ? '' : `<button class="btn bd2" onclick="removerUsuario(${JSON.stringify(u.email)})">Remover</button>`;
+    return `<tr><td>${escapeHtml(u.nome)}</td><td>${escapeHtml(u.email)}</td><td>${permissaoSelect}</td><td>${acoes}</td></tr>`;
+  }).join('');
+  document.getElementById('cfg-usuarios-empty').style.display = aprovados.length ? 'none' : 'block';
+  document.getElementById('cfg-usuarios-tabela').style.display = aprovados.length ? 'table' : 'none';
+}
+
+async function alterarPermissaoUsuario(email, novaPermissao){
+  if(email === ADMIN_EMAIL) return;
+  const {error} = await sb.rpc('alterar_permissao_usuario', {
+    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha,
+    p_alvo_email: email, p_nova_permissao: novaPermissao
+  });
+  if(error){ avisoErroSupabase('alterar permissão', error); return; }
+  registrarEvento('permissao_alterada', email+' -> '+novaPermissao, usuarioAtual.email);
+  await carregarUsuarios();
+  renderUsuarios();
+}
+
+async function removerUsuario(email){
+  if(email === ADMIN_EMAIL){ alert('Não é possível remover o administrador principal.'); return; }
+  if(!confirm('Remover o acesso deste usuário?')) return;
+  const {error} = await sb.rpc('remover_usuario', {
+    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
+  });
+  if(error){ avisoErroSupabase('remover usuário', error); return; }
+  registrarEvento('usuario_removido', email, usuarioAtual.email);
+  await carregarUsuarios();
+  renderUsuarios();
+}
+
+// ── CONFIG: CLONES POR UNIDADE ──────────────────────────────────
+function renderConfigClones(){
+  const unidade = document.getElementById('cfg-clone-unidade').value;
+  const lista = (config.clones[unidade]||[]).slice().sort((a,b)=>a.localeCompare(b));
+  const cont = document.getElementById('cfg-clone-lista');
+  cont.innerHTML = lista.map(c=>`<span class="chip">${escapeHtml(c)}<button type="button" onclick="removerClone(${JSON.stringify(unidade)},${JSON.stringify(c)})" title="Remover">×</button></span>`).join('');
+  document.getElementById('cfg-clone-empty').style.display = lista.length ? 'none' : 'block';
+}
+
+async function adicionarClone(){
+  const unidade = document.getElementById('cfg-clone-unidade').value;
+  const input = document.getElementById('cfg-clone-novo');
+  const nome = input.value.trim();
+  if(!nome) return;
+  const {error} = await sb.from('clones_unidade').insert({unidade, clone:nome});
+  if(error){
+    if(error.code==='23505'){ alert('Este clone já está cadastrado nesta unidade.'); }
+    else { avisoErroSupabase('adicionar clone', error); }
+    return;
+  }
+  input.value='';
+  await carregarConfig();
+  renderConfigClones();
+  atualizarOpcoesClone();
+}
+
+async function removerClone(unidade, nome){
+  const {error} = await sb.from('clones_unidade').delete().eq('unidade', unidade).eq('clone', nome);
+  if(error){ avisoErroSupabase('remover clone', error); return; }
+  await carregarConfig();
+  renderConfigClones();
+  atualizarOpcoesClone();
+}
+
+// ── CONFIG: COLABORADORAS POR UNIDADE ──────────────────────────────────
+function renderConfigColaboradoras(){
+  const unidade = document.getElementById('cfg-colab-unidade').value;
+  const mapa = config.colaboradoras[unidade]||{};
+  const tbody = document.getElementById('cfg-colab-tbody');
+  const entradas = Object.entries(mapa).sort((a,b)=> a[0].localeCompare(b[0], undefined, {numeric:true}));
+  tbody.innerHTML = entradas.map(([num,nome])=>`
+    <tr><td>${escapeHtml(num)}</td><td>${escapeHtml(nome)}</td>
+    <td><button type="button" class="btn bd2" onclick="removerColaboradora(${JSON.stringify(unidade)},${JSON.stringify(num)})">Excluir</button></td></tr>`).join('');
+  document.getElementById('cfg-colab-empty').style.display = entradas.length ? 'none' : 'block';
+  document.getElementById('cfg-colab-tabela').style.display = entradas.length ? 'table' : 'none';
+}
+
+async function adicionarColaboradora(){
+  const unidade = document.getElementById('cfg-colab-unidade').value;
+  const numero = document.getElementById('cfg-colab-numero').value.trim();
+  const nome = document.getElementById('cfg-colab-nome').value.trim();
+  if(!numero || !nome){ alert('Informe o número e o nome da colaboradora.'); return; }
+  const {error} = await sb.from('colaboradoras_unidade').upsert({unidade, numero, nome}, {onConflict:'unidade,numero'});
+  if(error){ avisoErroSupabase('salvar colaboradora', error); return; }
+  document.getElementById('cfg-colab-numero').value='';
+  document.getElementById('cfg-colab-nome').value='';
+  await carregarConfig();
+  renderConfigColaboradoras();
+  atualizarNomeColaboradora();
+}
+
+async function removerColaboradora(unidade, numero){
+  if(!confirm('Remover esta colaboradora?')) return;
+  const {error} = await sb.from('colaboradoras_unidade').delete().eq('unidade', unidade).eq('numero', numero);
+  if(error){ avisoErroSupabase('remover colaboradora', error); return; }
+  await carregarConfig();
+  renderConfigColaboradoras();
+  atualizarNomeColaboradora();
+}
+
+
+// ── LANÇAMENTO: CLONE (dependente da unidade) E NOME DA COLABORADORA ──────
+function atualizarOpcoesClone(){
+  const unidade = document.getElementById('f-unidade').value;
+  const sel = document.getElementById('f-clone');
+  const atual = sel.value;
+  if(!unidade){
+    sel.innerHTML = '<option value="">Selecione a unidade primeiro</option>';
+    sel.disabled = true;
+    return;
+  }
+  const clones = (config.clones[unidade]||[]).slice().sort((a,b)=>a.localeCompare(b));
+  sel.disabled = false;
+  if(!clones.length){
+    sel.innerHTML = '<option value="">Nenhum clone cadastrado nesta unidade</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">Selecione...</option>' + clones.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if(clones.includes(atual)) sel.value = atual;
+}
+
+function atualizarNomeColaboradora(){
+  const unidade = document.getElementById('f-unidade').value;
+  const numero = document.getElementById('f-colaboradora').value.trim();
+  const disp = document.getElementById('colaboradora-nome-display');
+  if(!unidade || !numero){ disp.textContent=''; return; }
+  const nome = (config.colaboradoras[unidade]||{})[numero];
+  disp.textContent = nome ? ('Nome: '+nome) : 'Colaboradora não cadastrada para esta unidade.';
+  disp.style.color = nome ? 'var(--gd)' : 'var(--rd)';
+}
+
+function hoje(){ return new Date().toISOString().slice(0,10); }
+
+function fmtPct(v){ return (v===null||v===undefined||isNaN(v)) ? '–' : v.toFixed(1)+'%'; }
+
+// ── CÁLCULO DE TAXAS ──────────────────────────────────
+function calcularTaxas(plantadas, mortas, enraizadas){
+  if(!plantadas || plantadas<=0) return {enr:null, sob:null};
+  const enr = (enraizadas/plantadas)*100;
+  const sob = ((plantadas-mortas)/plantadas)*100;
+  return {enr, sob};
+}
+
+function atualizarTaxas(){
+  const plantadas = parseInt(document.getElementById('f-plantadas').value)||0;
+  const mortas = parseInt(document.getElementById('f-mortas').value)||0;
+  const enraizadas = parseInt(document.getElementById('f-enraizadas').value)||0;
+
+  const warn = document.getElementById('warn-msg');
+  const fEnr = document.getElementById('f-enraizadas');
+  const fMor = document.getElementById('f-mortas');
+  let erro = '';
+  if(enraizadas > plantadas && plantadas>0){
+    erro = 'O número de mudas enraizadas não pode ser maior que o de plantadas.';
+  } else if(mortas > plantadas && plantadas>0){
+    erro = 'O número de mudas mortas não pode ser maior que o de plantadas.';
+  } else if((mortas + enraizadas) > plantadas && plantadas>0){
+    erro = 'A soma de mudas mortas + enraizadas ('+(mortas+enraizadas)+') não pode ser maior que o de plantadas ('+plantadas+').';
+  }
+
+  if(erro){
+    warn.textContent = erro; warn.classList.add('visible');
+    fEnr.classList.add('err');
+    fMor.classList.add('err');
+  } else {
+    warn.classList.remove('visible');
+    fEnr.classList.remove('err'); fMor.classList.remove('err');
+  }
+
+  const {enr, sob} = calcularTaxas(plantadas, mortas, enraizadas);
+  document.getElementById('rv-enr').textContent = fmtPct(enr);
+  document.getElementById('rv-sob').textContent = fmtPct(sob);
+}
+
+// ── SALVAR / EDITAR / EXCLUIR ──────────────────────────
+async function salvarLancamento(e){
+  e.preventDefault();
+  const plantadas = parseInt(document.getElementById('f-plantadas').value)||0;
+  const mortas = parseInt(document.getElementById('f-mortas').value)||0;
+  const enraizadas = parseInt(document.getElementById('f-enraizadas').value)||0;
+
+  if(enraizadas > plantadas){
+    alert('O número de mudas enraizadas não pode ser maior que o número de mudas plantadas.');
+    return false;
+  }
+  if(mortas > plantadas){
+    alert('O número de mudas mortas não pode ser maior que o número de mudas plantadas.');
+    return false;
+  }
+  if((mortas + enraizadas) > plantadas){
+    alert('A soma de mudas mortas ('+mortas+') + enraizadas ('+enraizadas+') não pode ser maior que o número de mudas plantadas ('+plantadas+').');
+    return false;
+  }
+
+  const {enr, sob} = calcularTaxas(plantadas, mortas, enraizadas);
+  const unidade = document.getElementById('f-unidade').value;
+  const colaboradora = document.getElementById('f-colaboradora').value.trim();
+  const colaboradoraNome = (config.colaboradoras[unidade]||{})[colaboradora] || '';
+
+  const registro = {
+    data: document.getElementById('f-data').value,
+    unidade,
+    avaliador: document.getElementById('f-avaliador').value.trim(),
+    cv: document.getElementById('f-cv').value,
+    canteiro: document.getElementById('f-canteiro').value,
+    colaboradora, colaboradoraNome,
+    clone: document.getElementById('f-clone').value.trim(),
+    plantio: document.getElementById('f-plantio').value,
+    lote: document.getElementById('f-lote').value.trim(),
+    plantadas, mortas, enraizadas,
+    taxaEnraizamento: enr, taxaSobrevivencia: sob,
+    obs: document.getElementById('f-obs').value.trim()
+  };
+
+  const foiEdicao = !!editandoId;
+  const linha = registroParaRow(registro);
+  const btnSalvar = document.getElementById('btn-salvar');
+  btnSalvar.disabled = true;
+  let erroSalvar = null;
+  try{
+    if(editandoId){
+      const {error} = await sb.from('lancamentos').update(linha).eq('id', editandoId);
+      erroSalvar = error;
+    } else {
+      const {error} = await sb.from('lancamentos').insert(linha);
+      erroSalvar = error;
+    }
+    if(erroSalvar){ avisoErroSupabase('salvar lançamento', erroSalvar); return false; }
+    registrarEvento(foiEdicao ? 'lancamento_editado' : 'lancamento_criado', unidade+' / '+registro.clone, usuarioAtual?.email);
+  } finally {
+    btnSalvar.disabled = false;
+  }
+
+  await carregarLancamentos();
+  cancelarEdicao();
+  if(foiEdicao){
+    limparForm();
+  } else {
+    limparParaProximoLancamento();
+  }
+  renderTudo();
+  return false;
+}
+
+function editarLancamento(id){
+  const r = db.find(x=>x.id===id);
+  if(!r) return;
+  editandoId = id;
+  document.getElementById('f-data').value = r.data;
+  document.getElementById('f-unidade').value = r.unidade;
+  atualizarOpcoesClone();
+  document.getElementById('f-avaliador').value = r.avaliador;
+  document.getElementById('f-cv').value = r.cv;
+  document.getElementById('f-canteiro').value = r.canteiro;
+  document.getElementById('f-colaboradora').value = r.colaboradora;
+  document.getElementById('f-clone').value = r.clone;
+  document.getElementById('f-plantio').value = r.plantio;
+  document.getElementById('f-lote').value = r.lote;
+  document.getElementById('f-plantadas').value = r.plantadas;
+  document.getElementById('f-mortas').value = r.mortas;
+  document.getElementById('f-enraizadas').value = r.enraizadas;
+  document.getElementById('f-obs').value = r.obs;
+  atualizarTaxas();
+  atualizarNomeColaboradora();
+  document.getElementById('edit-banner').classList.add('visible');
+  document.getElementById('btn-salvar').textContent = 'Atualizar lançamento';
+  trocarAba('page-lancamento', document.querySelector('.nt[data-page="page-lancamento"]'));
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function cancelarEdicao(){
+  editandoId = null;
+  document.getElementById('edit-banner').classList.remove('visible');
+  document.getElementById('btn-salvar').textContent = 'Salvar lançamento';
+}
+
+async function excluirLancamento(id){
+  if(!confirm('Excluir este lançamento? Esta ação não pode ser desfeita.')) return;
+  const {error} = await sb.from('lancamentos').delete().eq('id', id);
+  if(error){ avisoErroSupabase('excluir lançamento', error); return; }
+  registrarEvento('lancamento_excluido', id, usuarioAtual?.email);
+  await carregarLancamentos();
+  renderTudo();
+}
+
+function limparForm(){
+  document.getElementById('form-lanc').reset();
+  document.getElementById('f-data').value = hoje();
+  document.getElementById('rv-enr').textContent='–';
+  document.getElementById('rv-sob').textContent='–';
+  document.getElementById('warn-msg').classList.remove('visible');
+  document.getElementById('f-enraizadas').classList.remove('err');
+  document.getElementById('f-mortas').classList.remove('err');
+  atualizarOpcoesClone();
+  atualizarNomeColaboradora();
+}
+
+// Mantém Data, Unidade, Avaliador, CV e Observações preenchidos para o próximo
+// lançamento; limpa apenas os campos específicos daquele lote/canteiro.
+function limparParaProximoLancamento(){
+  document.getElementById('f-canteiro').value = '';
+  document.getElementById('f-colaboradora').value = '';
+  document.getElementById('f-clone').value = '';
+  document.getElementById('f-plantio').value = '';
+  document.getElementById('f-lote').value = '';
+  document.getElementById('f-plantadas').value = '';
+  document.getElementById('f-mortas').value = '';
+  document.getElementById('f-enraizadas').value = '';
+  document.getElementById('rv-enr').textContent = '–';
+  document.getElementById('rv-sob').textContent = '–';
+  document.getElementById('warn-msg').classList.remove('visible');
+  document.getElementById('f-enraizadas').classList.remove('err');
+  document.getElementById('f-mortas').classList.remove('err');
+  atualizarNomeColaboradora();
+}
+
+// ── ABAS ──────────────────────────────────
+function trocarAba(pageId, btn){
+  if(usuarioAtual){
+    const p = usuarioAtual.permissao;
+    if(pageId==='page-lancamento' && !(p==='admin'||p==='editor')) return;
+    if(pageId==='page-config' && p!=='admin') return;
+  }
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nt').forEach(n=>n.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  btn.classList.add('active');
+  if(pageId==='page-dashboard'){
+    popularFiltros(); renderDashboard();
+    carregarLancamentos().then(()=>{ popularFiltros(); renderDashboard(); });
+  }
+  if(pageId==='page-config'){
+    renderConfigClones(); renderConfigColaboradoras(); renderAprovacoes(); renderUsuarios();
+    Promise.all([carregarConfig(), carregarUsuarios()]).then(()=>{
+      renderConfigClones(); renderConfigColaboradoras(); renderAprovacoes(); renderUsuarios(); atualizarOpcoesClone();
+    });
+  }
+}
+
+// ── RENDER TABELA DE LANÇAMENTOS ──────────────────────────────────
+function renderTabelaLanc(){
+  const tbody = document.getElementById('tbody-lanc');
+  const ordenado = [...db].sort((a,b)=> b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
+  tbody.innerHTML = ordenado.map(r=>`
+    <tr>
+      <td>${fmtData(r.data)}</td><td>${escapeHtml(r.unidade)}</td><td>${escapeHtml(r.avaliador)}</td>
+      <td>${escapeHtml(r.cv)}</td><td>${escapeHtml(r.canteiro)}</td><td>${escapeHtml(r.colaboradora)}${r.colaboradoraNome? ' – '+escapeHtml(r.colaboradoraNome) : ''}</td>
+      <td>${escapeHtml(r.clone)}</td><td>${fmtData(r.plantio)}</td><td>${escapeHtml(r.lote)}</td>
+      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td>
+      <td>${fmtPct(r.taxaEnraizamento)}</td><td>${fmtPct(r.taxaSobrevivencia)}</td>
+      <td style="white-space:normal;max-width:180px;">${escapeHtml(r.obs)}</td>
+      <td><div style="display:flex;gap:4px;">
+        <button class="btn bedit" onclick="editarLancamento(${JSON.stringify(r.id)})">Editar</button>
+        <button class="btn bd2" onclick="excluirLancamento(${JSON.stringify(r.id)})">Excluir</button>
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('lanc-count').textContent = db.length+' registro'+(db.length!==1?'s':'');
+  document.getElementById('empty-lanc').style.display = db.length ? 'none' : 'block';
+  document.getElementById('tabela-lanc').style.display = db.length ? 'table' : 'none';
+}
+
+function fmtData(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// ── HEADER STATS ──────────────────────────────────
+function renderHeaderStats(){
+  document.getElementById('hd-total').textContent = db.length;
+}
+
+// ── DATALISTS (autocomplete) ──────────────────────────────────
+function atualizarDatalists(){
+  const preencher = (id, campo)=>{
+    const vals = [...new Set(db.map(r=>r[campo]).filter(Boolean))].sort();
+    document.getElementById(id).innerHTML = vals.map(v=>`<option value="${escapeHtml(v)}">`).join('');
+  };
+  preencher('dl-avaliador','avaliador');
+  preencher('dl-colaboradora','colaboradora');
+  preencher('dl-clone','clone');
+  preencher('dl-lote','lote');
+}
+
+// ── FILTROS DASHBOARD ──────────────────────────────────
+let clonesFiltroSelecionados = [];
+
+function popularFiltros(){
+  const campos = [
+    {id:'fi-unidade', campo:'unidade'},
+    {id:'fi-avaliador', campo:'avaliador'},
+    {id:'fi-colaboradora', campo:'colaboradora'},
+    {id:'fi-lote', campo:'lote'},
+    {id:'fi-cv', campo:'cv'},
+    {id:'fi-canteiro', campo:'canteiro'},
+  ];
+  campos.forEach(({id,campo})=>{
+    const sel = document.getElementById(id);
+    const atual = sel.value;
+    const vals = [...new Set(db.map(r=>r[campo]).filter(v=>v!==undefined && v!==''))]
+      .sort((a,b)=> isNaN(a)||isNaN(b) ? String(a).localeCompare(String(b)) : a-b);
+    sel.innerHTML = `<option value="">Todos</option>` + vals.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    if(vals.includes(atual)) sel.value = atual;
+  });
+  renderClonePanel();
+}
+
+// ── DROPDOWN DE CLONE (seleção múltipla, uma linha) ──────────────────────
+function renderClonePanel(){
+  const clones = [...new Set(db.map(r=>r.clone).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  clonesFiltroSelecionados = clonesFiltroSelecionados.filter(c=>clones.includes(c));
+  const panel = document.getElementById('fi-clone-panel');
+  if(!clones.length){
+    panel.innerHTML = '<div class="multisel-empty">Nenhum clone lançado ainda.</div>';
+  } else {
+    panel.innerHTML = clones.map(c=>`
+      <label class="multisel-opt">
+        <input type="checkbox" value="${escapeHtml(c)}" ${clonesFiltroSelecionados.includes(c)?'checked':''} onchange="onCloneOptionChange(${JSON.stringify(c)}, this.checked)">
+        <span class="box"></span>
+        ${escapeHtml(c)}${DUNNI_CLONES.includes(c)?' (Dunni)':''}
+      </label>`).join('');
+  }
+  atualizarLabelClone();
+}
+
+function onCloneOptionChange(clone, marcado){
+  if(marcado){
+    if(!clonesFiltroSelecionados.includes(clone)) clonesFiltroSelecionados.push(clone);
+  } else {
+    clonesFiltroSelecionados = clonesFiltroSelecionados.filter(c=>c!==clone);
+  }
+  atualizarLabelClone();
+  renderDashboard();
+}
+
+function atualizarLabelClone(){
+  const label = document.getElementById('fi-clone-label');
+  if(!clonesFiltroSelecionados.length) label.textContent = 'Todos';
+  else if(clonesFiltroSelecionados.length===1) label.textContent = clonesFiltroSelecionados[0];
+  else label.textContent = clonesFiltroSelecionados.length+' clones selecionados';
+}
+
+function toggleCloneDropdown(e){
+  e.stopPropagation();
+  const btn = document.getElementById('fi-clone-btn');
+  if(btn.classList.contains('disabled')) return;
+  document.getElementById('fi-clone-panel').classList.toggle('open');
+}
+
+document.addEventListener('click', (e)=>{
+  const wrap = document.getElementById('fi-clone-wrap');
+  if(wrap && !wrap.contains(e.target)) document.getElementById('fi-clone-panel').classList.remove('open');
+});
+
+function onToggleDunni(){
+  const dunni = document.getElementById('fi-dunni').checked;
+  document.getElementById('fi-clone-btn').classList.toggle('disabled', dunni);
+  document.getElementById('fi-clone-panel').classList.remove('open');
+  renderDashboard();
+}
+
+function limparFiltros(){
+  ['fi-unidade','fi-avaliador','fi-colaboradora','fi-lote','fi-cv','fi-canteiro'].forEach(id=>document.getElementById(id).value='');
+  clonesFiltroSelecionados = [];
+  document.getElementById('fi-dunni').checked = false;
+  document.getElementById('fi-clone-btn').classList.remove('disabled');
+  renderClonePanel();
+  document.getElementById('fi-data-ini').value='';
+  document.getElementById('fi-data-fim').value='';
+  renderDashboard();
+}
+
+function getFiltrados(){
+  const un = document.getElementById('fi-unidade').value;
+  const av = document.getElementById('fi-avaliador').value;
+  const co = document.getElementById('fi-colaboradora').value;
+  const lo = document.getElementById('fi-lote').value;
+  const dunniOnly = document.getElementById('fi-dunni').checked;
+  const clonesSelecionados = dunniOnly ? DUNNI_CLONES : clonesFiltroSelecionados;
+  const cv = document.getElementById('fi-cv').value;
+  const ct = document.getElementById('fi-canteiro').value;
+  const dIni = document.getElementById('fi-data-ini').value;
+  const dFim = document.getElementById('fi-data-fim').value;
+
+  return db.filter(r=>{
+    if(un && r.unidade!==un) return false;
+    if(av && r.avaliador!==av) return false;
+    if(co && r.colaboradora!==co) return false;
+    if(lo && r.lote!==lo) return false;
+    if(clonesSelecionados.length && !clonesSelecionados.includes(r.clone)) return false;
+    if(cv && String(r.cv)!==cv) return false;
+    if(ct && String(r.canteiro)!==ct) return false;
+    if(dIni && r.data<dIni) return false;
+    if(dFim && r.data>dFim) return false;
+    return true;
+  });
+}
+
+// ── DASHBOARD: MÉTRICAS + GRÁFICO + TABELA ──────────────────────────────────
+function renderDashboard(){
+  const filtrados = getFiltrados();
+
+  const totPlant = filtrados.reduce((s,r)=>s+r.plantadas,0);
+  const totMort = filtrados.reduce((s,r)=>s+r.mortas,0);
+  const totEnr = filtrados.reduce((s,r)=>s+r.enraizadas,0);
+
+  document.getElementById('db-count').textContent = filtrados.length;
+  document.getElementById('db-plantadas').textContent = totPlant;
+  document.getElementById('db-mortas').textContent = totMort;
+  document.getElementById('db-enraizadas').textContent = totEnr;
+  document.getElementById('db-taxa-enr').textContent = totPlant ? fmtPct((totEnr/totPlant)*100) : '–';
+  document.getElementById('db-taxa-sob').textContent = totPlant ? fmtPct(((totPlant-totMort)/totPlant)*100) : '–';
+
+  // agrupar por data (soma ponderada por dia)
+  const porData = {};
+  filtrados.forEach(r=>{
+    if(!porData[r.data]) porData[r.data] = {plant:0, mort:0, enr:0};
+    porData[r.data].plant += r.plantadas;
+    porData[r.data].mort += r.mortas;
+    porData[r.data].enr += r.enraizadas;
+  });
+  const datas = Object.keys(porData).sort();
+  const serieEnr = datas.map(d=> porData[d].plant ? (porData[d].enr/porData[d].plant)*100 : null);
+  const serieSob = datas.map(d=> porData[d].plant ? ((porData[d].plant-porData[d].mort)/porData[d].plant)*100 : null);
+
+  document.getElementById('empty-chart').style.display = datas.length ? 'none' : 'block';
+  const canvas = document.getElementById('chart-evolucao');
+  canvas.style.display = datas.length ? 'block' : 'none';
+
+  if(chartEvolucao) chartEvolucao.destroy();
+  if(datas.length){
+    chartEvolucao = new Chart(canvas, {
+      type:'line',
+      data:{
+        labels: datas.map(fmtData),
+        datasets:[
+          {label:'Enraizamento (%)', data: serieEnr, borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3},
+          {label:'Sobrevivência (%)', data: serieSob, borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{ y:{ min:0, max:100, ticks:{ callback:v=>v+'%' } } },
+        plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label: ctx=> ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%' } } }
+      }
+    });
+  }
+
+  const tbody = document.getElementById('tbody-dash');
+  const ordenado = [...filtrados].sort((a,b)=> b.data.localeCompare(a.data));
+  tbody.innerHTML = ordenado.map(r=>`
+    <tr>
+      <td>${fmtData(r.data)}</td><td>${escapeHtml(r.unidade)}</td><td>${escapeHtml(r.avaliador)}</td>
+      <td>${escapeHtml(r.cv)}</td><td>${escapeHtml(r.canteiro)}</td><td>${escapeHtml(r.colaboradora)}${r.colaboradoraNome? ' – '+escapeHtml(r.colaboradoraNome) : ''}</td>
+      <td>${escapeHtml(r.clone)}</td><td>${fmtData(r.plantio)}</td><td>${escapeHtml(r.lote)}</td>
+      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td>
+      <td>${fmtPct(r.taxaEnraizamento)}</td><td>${fmtPct(r.taxaSobrevivencia)}</td>
+    </tr>`).join('');
+  document.getElementById('db-tab-count').textContent = filtrados.length+' registro'+(filtrados.length!==1?'s':'');
+  document.getElementById('empty-dash').style.display = filtrados.length ? 'none' : 'block';
+  document.getElementById('tabela-dash').style.display = filtrados.length ? 'table' : 'none';
+}
+
+// ── EXPORTAR EXCEL ──────────────────────────────────
+function exportarExcel(lista, nomeArquivo){
+  if(!lista.length){ alert('Não há registros para exportar.'); return; }
+  const linhas = lista.map(r=>({
+    'Data': fmtData(r.data), 'Unidade': r.unidade, 'Avaliador': r.avaliador,
+    'CV': r.cv, 'Canteiro': r.canteiro, 'Nº Colaboradora': r.colaboradora, 'Nome da colaboradora': r.colaboradoraNome||'',
+    'Clone': r.clone, 'Data de plantio': fmtData(r.plantio), 'Lote': r.lote,
+    'Mudas plantadas': r.plantadas, 'Mudas mortas': r.mortas, 'Mudas enraizadas': r.enraizadas,
+    'Taxa enraizamento (%)': r.taxaEnraizamento!==null? +r.taxaEnraizamento.toFixed(1) : '',
+    'Taxa sobrevivência (%)': r.taxaSobrevivencia!==null? +r.taxaSobrevivencia.toFixed(1) : '',
+    'Observações': r.obs||''
+  }));
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Enraizamento');
+  XLSX.writeFile(wb, nomeArquivo+'_'+hoje()+'.xlsx');
+}
+
+// ── RENDER GERAL ──────────────────────────────────
+function renderTudo(){
+  renderTabelaLanc();
+  renderHeaderStats();
+  atualizarDatalists();
+  atualizarOpcoesClone();
+  atualizarNomeColaboradora();
+  if(document.getElementById('page-dashboard').classList.contains('active')){
+    popularFiltros();
+    renderDashboard();
+  }
+  if(document.getElementById('page-config').classList.contains('active') && usuarioAtual && usuarioAtual.permissao==='admin'){
+    renderConfigClones();
+    renderConfigColaboradoras();
+    renderAprovacoes();
+    renderUsuarios();
+  }
+}
+
+async function tentarSessaoSalva(){
+  const token = localStorage.getItem(SESSION_KEY);
+  if(!token){
+    document.getElementById('auth-screen').style.display = 'flex';
+    return;
+  }
+  const {data, error} = await sb.rpc('validar_sessao', {p_token: token});
+  const userSalvo = Array.isArray(data) ? data[0] : data;
+  if(error || !userSalvo){
+    localStorage.removeItem(SESSION_KEY);
+    document.getElementById('auth-screen').style.display = 'flex';
+    return;
+  }
+  // Sessão restaurada sem a senha em mãos: ações administrativas vão pedir
+  // a senha de novo na hora (ver garantirSenhaAdmin).
+  usuarioAtualSenha = null;
+  if(userSalvo.status === 'aprovado'){
+    iniciarSessao(userSalvo);
+  } else if(userSalvo.status === 'pendente'){
+    mostrarTelaPendente();
+  } else {
+    document.getElementById('auth-screen').style.display = 'flex';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('f-data').value = hoje();
+  atualizarOpcoesClone();
+  tentarSessaoSalva();
+});
+</script>
+</body>
+</html>
