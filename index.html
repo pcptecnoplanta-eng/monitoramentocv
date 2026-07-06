@@ -513,6 +513,15 @@ function escapeHtml(valor){
   }[c]));
 }
 
+// Serializa um valor em JSON (para passar como argumento de string para uma
+// função JS num onclick/onchange) E escapa o resultado para caber dentro de
+// um atributo HTML delimitado por aspas duplas. Sem isso, um valor que
+// contivesse aspas quebraria o atributo pela metade — foi exatamente o bug
+// que causava "Unexpected end of input" ao clicar em Aprovar/Remover.
+function jsAttr(valor){
+  return escapeHtml(JSON.stringify(valor));
+}
+
 function rowParaRegistro(row){
   return {
     id: row.id, data: row.data, unidade: row.unidade, avaliador: row.avaliador,
@@ -830,8 +839,8 @@ function renderAprovacoes(){
     <tr>
       <td>${escapeHtml(u.nome)}</td><td>${escapeHtml(u.email)}</td><td>${escapeHtml(NOMES_PERMISSAO[u.permissao]||u.permissao)}</td>
       <td><div style="display:flex;gap:6px;">
-        <button class="btn bp" style="padding:5px 12px;font-size:11px;" onclick="aprovarUsuario(${JSON.stringify(u.email)})">Aprovar</button>
-        <button class="btn bd2" onclick="recusarUsuario(${JSON.stringify(u.email)})">Recusar</button>
+        <button class="btn bp" style="padding:5px 12px;font-size:11px;" onclick="aprovarUsuario(${jsAttr(u.email)})">Aprovar</button>
+        <button class="btn bd2" onclick="recusarUsuario(${jsAttr(u.email)})">Recusar</button>
       </div></td>
     </tr>`).join('');
   document.getElementById('cfg-aprovacoes-empty').style.display = pendentes.length ? 'none' : 'block';
@@ -868,12 +877,12 @@ function renderUsuarios(){
     const ehAdminFixo = u.email === ADMIN_EMAIL;
     const permissaoSelect = ehAdminFixo
       ? `<span style="color:var(--gd);font-weight:600;">Administrador</span>`
-      : `<select onchange="alterarPermissaoUsuario(${JSON.stringify(u.email)}, this.value)" style="padding:5px 8px;font-size:12px;">
+      : `<select onchange="alterarPermissaoUsuario(${jsAttr(u.email)}, this.value)" style="padding:5px 8px;font-size:12px;">
           <option value="visualizador" ${u.permissao==='visualizador'?'selected':''}>Visualizador</option>
           <option value="editor" ${u.permissao==='editor'?'selected':''}>Editor</option>
           <option value="admin" ${u.permissao==='admin'?'selected':''}>Administrador</option>
         </select>`;
-    const acoes = ehAdminFixo ? '' : `<button class="btn bd2" onclick="removerUsuario(${JSON.stringify(u.email)})">Remover</button>`;
+    const acoes = ehAdminFixo ? '' : `<button class="btn bd2" onclick="removerUsuario(${jsAttr(u.email)})">Remover</button>`;
     return `<tr><td>${escapeHtml(u.nome)}</td><td>${escapeHtml(u.email)}</td><td>${permissaoSelect}</td><td>${acoes}</td></tr>`;
   }).join('');
   document.getElementById('cfg-usuarios-empty').style.display = aprovados.length ? 'none' : 'block';
@@ -909,7 +918,7 @@ function renderConfigClones(){
   const unidade = document.getElementById('cfg-clone-unidade').value;
   const lista = (config.clones[unidade]||[]).slice().sort((a,b)=>a.localeCompare(b));
   const cont = document.getElementById('cfg-clone-lista');
-  cont.innerHTML = lista.map(c=>`<span class="chip">${escapeHtml(c)}<button type="button" onclick="removerClone(${JSON.stringify(unidade)},${JSON.stringify(c)})" title="Remover">×</button></span>`).join('');
+  cont.innerHTML = lista.map(c=>`<span class="chip">${escapeHtml(c)}<button type="button" onclick="removerClone(${jsAttr(unidade)},${jsAttr(c)})" title="Remover">×</button></span>`).join('');
   document.getElementById('cfg-clone-empty').style.display = lista.length ? 'none' : 'block';
 }
 
@@ -946,7 +955,7 @@ function renderConfigColaboradoras(){
   const entradas = Object.entries(mapa).sort((a,b)=> a[0].localeCompare(b[0], undefined, {numeric:true}));
   tbody.innerHTML = entradas.map(([num,nome])=>`
     <tr><td>${escapeHtml(num)}</td><td>${escapeHtml(nome)}</td>
-    <td><button type="button" class="btn bd2" onclick="removerColaboradora(${JSON.stringify(unidade)},${JSON.stringify(num)})">Excluir</button></td></tr>`).join('');
+    <td><button type="button" class="btn bd2" onclick="removerColaboradora(${jsAttr(unidade)},${jsAttr(num)})">Excluir</button></td></tr>`).join('');
   document.getElementById('cfg-colab-empty').style.display = entradas.length ? 'none' : 'block';
   document.getElementById('cfg-colab-tabela').style.display = entradas.length ? 'table' : 'none';
 }
@@ -1226,8 +1235,8 @@ function renderTabelaLanc(){
       <td>${fmtPct(r.taxaEnraizamento)}</td><td>${fmtPct(r.taxaSobrevivencia)}</td>
       <td style="white-space:normal;max-width:180px;">${escapeHtml(r.obs)}</td>
       <td><div style="display:flex;gap:4px;">
-        <button class="btn bedit" onclick="editarLancamento(${JSON.stringify(r.id)})">Editar</button>
-        <button class="btn bd2" onclick="excluirLancamento(${JSON.stringify(r.id)})">Excluir</button>
+        <button class="btn bedit" onclick="editarLancamento(${jsAttr(r.id)})">Editar</button>
+        <button class="btn bd2" onclick="excluirLancamento(${jsAttr(r.id)})">Excluir</button>
       </div></td>
     </tr>`).join('');
   document.getElementById('lanc-count').textContent = db.length+' registro'+(db.length!==1?'s':'');
@@ -1291,7 +1300,7 @@ function renderClonePanel(){
   } else {
     panel.innerHTML = clones.map(c=>`
       <label class="multisel-opt">
-        <input type="checkbox" value="${escapeHtml(c)}" ${clonesFiltroSelecionados.includes(c)?'checked':''} onchange="onCloneOptionChange(${JSON.stringify(c)}, this.checked)">
+        <input type="checkbox" value="${escapeHtml(c)}" ${clonesFiltroSelecionados.includes(c)?'checked':''} onchange="onCloneOptionChange(${jsAttr(c)}, this.checked)">
         <span class="box"></span>
         ${escapeHtml(c)}${DUNNI_CLONES.includes(c)?' (Dunni)':''}
       </label>`).join('');
