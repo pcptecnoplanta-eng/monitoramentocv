@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monitoramento — Enraizamento de Mudas Clonais</title>
+<link rel="icon" type="image/png" href="ico.png">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="chart.umd.js"></script>
 <script src="xlsx.full.min.js"></script>
@@ -115,7 +116,9 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 /* ── AUTH ── */
 #auth-screen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center;padding:1rem;}
 .auth-box{background:var(--sf);border:1px solid var(--brl);border-radius:16px;padding:2rem 2.25rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.08);}
-.auth-logo{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gm);margin-bottom:.25rem;}
+.auth-logo-img{display:block;max-height:44px;max-width:180px;margin:0 auto 1rem;object-fit:contain;}
+.header-logo-img{height:34px;max-width:120px;object-fit:contain;flex-shrink:0;}
+@media(max-width:640px){ .header-logo-img{height:26px;max-width:90px;} }
 .auth-title{font-size:20px;font-weight:700;color:var(--gd);margin-bottom:.15rem;}
 .auth-sub{font-size:12px;color:var(--txm);margin-bottom:1.5rem;}
 .auth-field{display:flex;flex-direction:column;gap:4px;margin-bottom:.875rem;}
@@ -129,6 +132,8 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 .auth-error{background:var(--rl);color:var(--rd);border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:.75rem;display:none;}
 .auth-success{background:var(--gl);color:var(--gd);border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:.75rem;display:none;}
 #auth-pending-screen{position:fixed;inset:0;background:var(--bg);z-index:998;display:none;align-items:center;justify-content:center;padding:1rem;}
+.modal-overlay{position:fixed;inset:0;background:rgba(44,44,42,.45);z-index:1100;display:none;align-items:center;justify-content:center;padding:1rem;}
+.modal-overlay.open{display:flex;}
 
 /* ── CUSTOM CHECKBOX ── */
 .chk-label{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:12px;color:var(--txm);cursor:pointer;text-transform:none;font-weight:500;letter-spacing:normal;}
@@ -162,7 +167,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 <div id="auth-screen">
   <!-- LOGIN PANEL -->
   <div class="auth-box" id="auth-login-box">
-    <div class="auth-logo">TECNOPLANTA</div>
+    <img src="logo.png" alt="Tecnoplanta" class="auth-logo-img">
     <div class="auth-title">Monitoramento</div>
     <div class="auth-sub">Enraizamento de Mudas Clonais</div>
     <div class="auth-error" id="login-error"></div>
@@ -178,7 +183,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 
   <!-- REGISTER PANEL -->
   <div class="auth-box" id="auth-register-box" style="display:none;">
-    <div class="auth-logo">TECNOPLANTA</div>
+    <img src="logo.png" alt="Tecnoplanta" class="auth-logo-img">
     <div class="auth-title">Criar conta</div>
     <div class="auth-sub">Preencha os dados para solicitar acesso.</div>
     <div class="auth-error" id="register-error"></div>
@@ -202,7 +207,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 
   <!-- FORGOT PANEL -->
   <div class="auth-box" id="auth-forgot-box" style="display:none;">
-    <div class="auth-logo">TECNOPLANTA</div>
+    <img src="logo.png" alt="Tecnoplanta" class="auth-logo-img">
     <div class="auth-title">Redefinir senha</div>
     <div class="auth-sub">Como o acesso é feito localmente neste dispositivo, a redefinição precisa ser feita por um administrador.</div>
     <div class="auth-error" id="forgot-error"></div>
@@ -216,18 +221,37 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 <!-- ══════════ PENDING SCREEN ══════════ -->
 <div id="auth-pending-screen">
   <div class="auth-box" style="text-align:center;">
-    <div class="auth-logo">TECNOPLANTA</div>
+    <img src="logo.png" alt="Tecnoplanta" class="auth-logo-img">
     <div class="auth-title">Acesso pendente</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:1.5rem;">Sua solicitação de acesso está aguardando aprovação do administrador. Você será notificado quando for liberado.</div>
     <button class="auth-btn ghost" onclick="doLogout()" style="color:var(--txm);">Sair</button>
   </div>
 </div>
 
+<!-- ══════════ MODAL: CONFIRMAR SENHA DE ADMIN ══════════ -->
+<div id="modal-senha-admin" class="modal-overlay">
+  <div class="auth-box" style="max-width:380px;">
+    <div class="auth-title" style="font-size:16px;">Confirmar identidade</div>
+    <div class="auth-sub">Por segurança, confirme sua senha de administrador para continuar.</div>
+    <div class="auth-field">
+      <label>Senha</label>
+      <input type="password" id="modal-senha-input" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:.5rem;">
+      <button type="button" class="btn bs" style="flex:1;" id="modal-senha-cancelar">Cancelar</button>
+      <button type="button" class="btn bp" style="flex:1;" id="modal-senha-confirmar">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <div id="app-content" style="display:none;">
 <header>
-  <div>
-    <h1>MONITORAMENTO DE ENRAIZAMENTO</h1>
-    <p>Mudas Clonais · Viveiro</p>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <img src="logo.png" alt="Tecnoplanta" class="header-logo-img">
+    <div>
+      <h1>MONITORAMENTO DE ENRAIZAMENTO</h1>
+      <p>Mudas Clonais · Viveiro</p>
+    </div>
   </div>
   <div class="hs">
     <div class="hstat"><strong id="hd-total">0</strong><p>Lançamentos</p></div>
@@ -293,11 +317,6 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
         <div class="field"><label>Mudas enraizadas</label><input type="number" id="f-enraizadas" min="0" step="1" required oninput="atualizarTaxas()"></div>
       </div>
       <div class="warn-msg" id="warn-msg"></div>
-
-      <div class="field" style="max-width:220px;margin-bottom:10px;">
-        <label>Sem raiz <span style="text-transform:none;font-weight:400;">(opcional)</span></label>
-        <input type="number" id="f-sem-raiz" min="0" step="1" placeholder="Opcional">
-      </div>
 
       <div class="rates">
         <div class="rate-box re"><div class="rl">Taxa de enraizamento</div><div class="rv" id="rv-enr">–</div></div>
@@ -569,7 +588,7 @@ function rowParaRegistro(row){
     id: row.id, data: row.data, unidade: row.unidade, avaliador: row.avaliador,
     cv: row.cv, canteiro: row.canteiro, colaboradora: row.colaboradora, colaboradoraNome: row.colaboradora_nome,
     clone: row.clone, plantio: row.plantio, lote: row.lote,
-    plantadas: row.plantadas, mortas: row.mortas, enraizadas: row.enraizadas, semRaiz: row.sem_raiz,
+    plantadas: row.plantadas, mortas: row.mortas, enraizadas: row.enraizadas,
     taxaEnraizamento: row.taxa_enraizamento, taxaSobrevivencia: row.taxa_sobrevivencia,
     obs: row.obs, criadoEm: row.criado_em
   };
@@ -579,7 +598,7 @@ function registroParaRow(r){
     data: r.data, unidade: r.unidade, avaliador: r.avaliador, cv: r.cv, canteiro: r.canteiro,
     colaboradora: r.colaboradora, colaboradora_nome: r.colaboradoraNome, clone: r.clone,
     plantio: r.plantio, lote: r.lote, plantadas: r.plantadas, mortas: r.mortas, enraizadas: r.enraizadas,
-    sem_raiz: r.semRaiz, taxa_enraizamento: r.taxaEnraizamento, taxa_sobrevivencia: r.taxaSobrevivencia, obs: r.obs
+    sem_raiz: null, taxa_enraizamento: r.taxaEnraizamento, taxa_sobrevivencia: r.taxaSobrevivencia, obs: r.obs
   };
 }
 
@@ -618,9 +637,41 @@ async function registrarEvento(tipo, detalhe, emailUsuario){
 // senha não fica guardada em lugar nenhum. Para qualquer ação de admin
 // (aprovar, remover, listar usuários...), pedimos a senha de novo aqui,
 // só uma vez por sessão de navegação, e ela é conferida no banco.
+// Mostra o modal de confirmação de senha e devolve o que a pessoa digitou
+// (ou null se cancelou). Usa um <input type="password"> de verdade, então
+// o texto aparece mascarado — diferente do prompt() nativo do navegador.
+function pedirSenhaModal(){
+  return new Promise((resolve)=>{
+    const overlay = document.getElementById('modal-senha-admin');
+    const input = document.getElementById('modal-senha-input');
+    const btnConfirmar = document.getElementById('modal-senha-confirmar');
+    const btnCancelar = document.getElementById('modal-senha-cancelar');
+    input.value = '';
+    overlay.classList.add('open');
+    setTimeout(()=>input.focus(), 50);
+
+    function limpar(){
+      overlay.classList.remove('open');
+      btnConfirmar.removeEventListener('click', onConfirmar);
+      btnCancelar.removeEventListener('click', onCancelar);
+      input.removeEventListener('keydown', onKeydown);
+    }
+    function onConfirmar(){ const v = input.value; limpar(); resolve(v || null); }
+    function onCancelar(){ limpar(); resolve(null); }
+    function onKeydown(e){
+      if(e.key==='Enter'){ e.preventDefault(); onConfirmar(); }
+      else if(e.key==='Escape'){ onCancelar(); }
+    }
+
+    btnConfirmar.addEventListener('click', onConfirmar);
+    btnCancelar.addEventListener('click', onCancelar);
+    input.addEventListener('keydown', onKeydown);
+  });
+}
+
 async function garantirSenhaAdmin(){
   if(usuarioAtualSenha) return true;
-  const senha = prompt('Por segurança, confirme sua senha de administrador para gerenciar usuários:');
+  const senha = await pedirSenhaModal();
   if(!senha) return false;
   const {data, error} = await sb.rpc('eh_admin_valido', {p_admin_email: usuarioAtual.email, p_admin_senha: senha});
   if(error || !data){ alert('Senha incorreta.'); return false; }
@@ -1136,6 +1187,14 @@ function calcularTaxas(plantadas, mortas, enraizadas){
 }
 
 // Idade = dias entre a data de plantio e a data da avaliação. Calculada
+// "Sem raiz" não é mais digitado: é sempre calculado como
+// plantadas - mortas - enraizadas, direto na exibição (vale também para
+// lançamentos antigos, sem precisar editar nada).
+function calcularSemRaiz(plantadas, mortas, enraizadas){
+  if(plantadas===null || plantadas===undefined || mortas===null || mortas===undefined || enraizadas===null || enraizadas===undefined) return null;
+  return plantadas - mortas - enraizadas;
+}
+
 // sempre na hora (não fica salva no banco), então já vale automaticamente
 // para lançamentos antigos, sem precisar de nenhuma migração de dados.
 function calcularIdadeDias(dataAvaliacao, dataPlantio){
@@ -1237,7 +1296,6 @@ async function salvarLancamento(e){
     plantio: document.getElementById('f-plantio').value,
     lote: document.getElementById('f-lote').value.trim(),
     plantadas, mortas, enraizadas,
-    semRaiz: document.getElementById('f-sem-raiz').value === '' ? null : parseInt(document.getElementById('f-sem-raiz').value),
     taxaEnraizamento: enr, taxaSobrevivencia: sob,
     obs: document.getElementById('f-obs').value.trim()
   };
@@ -1290,7 +1348,6 @@ function editarLancamento(id){
   document.getElementById('f-plantadas').value = r.plantadas;
   document.getElementById('f-mortas').value = r.mortas;
   document.getElementById('f-enraizadas').value = r.enraizadas;
-  document.getElementById('f-sem-raiz').value = (r.semRaiz===null || r.semRaiz===undefined) ? '' : r.semRaiz;
   document.getElementById('f-obs').value = r.obs;
   atualizarTaxas();
   atualizarNomeColaboradora();
@@ -1332,13 +1389,12 @@ function limparForm(){
 // lançamento; limpa apenas os campos específicos daquele lote/canteiro.
 // Mantém Data, Unidade, Avaliador, CV, Canteiro, Clone, Data de plantio e
 // Lote preenchidos para o próximo lançamento; limpa colaboradora, as
-// quantidades (plantadas/mortas/enraizadas/sem raiz) e observações.
+// quantidades (plantadas/mortas/enraizadas) e observações.
 function limparParaProximoLancamento(){
   document.getElementById('f-colaboradora').value = '';
   document.getElementById('f-plantadas').value = '';
   document.getElementById('f-mortas').value = '';
   document.getElementById('f-enraizadas').value = '';
-  document.getElementById('f-sem-raiz').value = '';
   document.getElementById('f-obs').value = '';
   document.getElementById('rv-enr').textContent = '–';
   document.getElementById('rv-sob').textContent = '–';
@@ -1411,7 +1467,7 @@ function renderTabelaLanc(){
       <td>${fmtData(r.data)}</td><td>${escapeHtml(r.unidade)}</td><td>${escapeHtml(r.avaliador)}</td>
       <td>${escapeHtml(r.cv)}</td><td>${escapeHtml(r.canteiro)}</td><td>${escapeHtml(r.colaboradora)}${r.colaboradoraNome? ' – '+escapeHtml(r.colaboradoraNome) : ''}</td>
       <td>${escapeHtml(r.clone)}</td><td>${fmtData(r.plantio)}</td><td>${calcularIdadeDias(r.data,r.plantio) ?? ''}</td><td>${escapeHtml(r.lote)}</td>
-      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td><td>${r.semRaiz??''}</td>
+      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td><td>${calcularSemRaiz(r.plantadas,r.mortas,r.enraizadas) ?? ''}</td>
       <td>${fmtPct(r.taxaEnraizamento)}</td><td>${fmtPct(r.taxaSobrevivencia)}</td>
       <td style="white-space:normal;max-width:180px;">${escapeHtml(r.obs)}</td>
       <td><div style="display:flex;gap:4px;">
@@ -1641,7 +1697,7 @@ function renderDashboard(){
       <td>${fmtData(r.data)}</td><td>${escapeHtml(r.unidade)}</td><td>${escapeHtml(r.avaliador)}</td>
       <td>${escapeHtml(r.cv)}</td><td>${escapeHtml(r.canteiro)}</td><td>${escapeHtml(r.colaboradora)}${r.colaboradoraNome? ' – '+escapeHtml(r.colaboradoraNome) : ''}</td>
       <td>${escapeHtml(r.clone)}</td><td>${fmtData(r.plantio)}</td><td>${calcularIdadeDias(r.data,r.plantio) ?? ''}</td><td>${escapeHtml(r.lote)}</td>
-      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td><td>${r.semRaiz??''}</td>
+      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td><td>${calcularSemRaiz(r.plantadas,r.mortas,r.enraizadas) ?? ''}</td>
       <td>${fmtPct(r.taxaEnraizamento)}</td><td>${fmtPct(r.taxaSobrevivencia)}</td>
     </tr>`).join('');
   document.getElementById('db-tab-count').textContent = filtrados.length+' registro'+(filtrados.length!==1?'s':'');
@@ -1657,7 +1713,7 @@ function exportarExcel(lista, nomeArquivo){
     'Data': fmtData(r.data), 'Unidade': r.unidade, 'Avaliador': r.avaliador,
     'CV': r.cv, 'Canteiro': r.canteiro, 'Nº Colaboradora': r.colaboradora, 'Nome da colaboradora': r.colaboradoraNome||'',
     'Clone': r.clone, 'Data de plantio': fmtData(r.plantio), 'Idade (dias)': calcularIdadeDias(r.data, r.plantio) ?? '', 'Lote': r.lote,
-    'Mudas plantadas': r.plantadas, 'Mudas mortas': r.mortas, 'Mudas enraizadas': r.enraizadas, 'Sem raiz': r.semRaiz ?? '',
+    'Mudas plantadas': r.plantadas, 'Mudas mortas': r.mortas, 'Mudas enraizadas': r.enraizadas, 'Sem raiz': calcularSemRaiz(r.plantadas, r.mortas, r.enraizadas) ?? '',
     'Taxa enraizamento (%)': r.taxaEnraizamento!==null? +r.taxaEnraizamento.toFixed(1) : '',
     'Taxa sobrevivência (%)': r.taxaSobrevivencia!==null? +r.taxaSobrevivencia.toFixed(1) : '',
     'Observações': r.obs||''
