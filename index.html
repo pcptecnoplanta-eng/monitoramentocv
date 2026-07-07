@@ -96,6 +96,9 @@ td{padding:6px 10px;border:1px solid var(--brl);vertical-align:top;white-space:n
 tr:hover td{background:var(--yll);}
 .chart-wrap{position:relative;height:340px;}
 .empty{padding:2rem 1rem;text-align:center;color:var(--txm);font-size:13px;}
+.pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:1rem;}
+.pagination .btn{padding:6px 14px;font-size:12px;}
+.pagination .pag-info{font-size:12px;color:var(--txm);font-family:var(--mo);}
 footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 .chip{display:inline-flex;align-items:center;gap:4px;background:var(--gl);color:var(--gd);border:1px solid var(--gm);border-radius:20px;padding:6px 6px 6px 13px;font-size:12px;font-weight:500;}
 .chip button{background:none;border:none;color:var(--gd);cursor:pointer;font-size:15px;line-height:1;padding:3px 7px;border-radius:50%;}
@@ -291,6 +294,11 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       </div>
       <div class="warn-msg" id="warn-msg"></div>
 
+      <div class="field" style="max-width:220px;margin-bottom:10px;">
+        <label>Sem raiz <span style="text-transform:none;font-weight:400;">(opcional)</span></label>
+        <input type="number" id="f-sem-raiz" min="0" step="1" placeholder="Opcional">
+      </div>
+
       <div class="rates">
         <div class="rate-box re"><div class="rl">Taxa de enraizamento</div><div class="rv" id="rv-enr">–</div></div>
         <div class="rate-box rs"><div class="rl">Taxa de sobrevivência</div><div class="rv" id="rv-sob">–</div></div>
@@ -320,13 +328,14 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       <table id="tabela-lanc">
         <thead><tr>
           <th>Data</th><th>Unidade</th><th>Avaliador</th><th>CV</th><th>Canteiro</th><th>Colaboradora</th>
-          <th>Clone</th><th>Data plantio</th><th>Lote</th><th>Plantadas</th><th>Mortas</th><th>Enraizadas</th>
+          <th>Clone</th><th>Data plantio</th><th>Idade (dias)</th><th>Lote</th><th>Plantadas</th><th>Mortas</th><th>Enraizadas</th><th>Sem raiz</th>
           <th>Enraiz. %</th><th>Sobrev. %</th><th>Obs.</th><th></th>
         </tr></thead>
         <tbody id="tbody-lanc"></tbody>
       </table>
     </div>
     <div class="empty" id="empty-lanc" style="display:none;">Nenhum lançamento registrado ainda.</div>
+    <div class="pagination" id="pag-lanc"></div>
   </div>
 </div>
 
@@ -336,10 +345,10 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   <div class="card">
     <div class="ct">Filtros</div>
     <div class="g4" style="margin-bottom:10px;">
-      <div class="field"><label>Unidade</label><select id="fi-unidade" onchange="renderDashboard()"><option value="">Todas</option></select></div>
-      <div class="field"><label>Avaliador</label><select id="fi-avaliador" onchange="renderDashboard()"><option value="">Todos</option></select></div>
-      <div class="field"><label>Colaboradora</label><select id="fi-colaboradora" onchange="renderDashboard()"><option value="">Todas</option></select></div>
-      <div class="field"><label>Lote</label><select id="fi-lote" onchange="renderDashboard()"><option value="">Todos</option></select></div>
+      <div class="field"><label>Unidade</label><select id="fi-unidade" onchange="aplicarFiltrosDashboard()"><option value="">Todas</option></select></div>
+      <div class="field"><label>Avaliador</label><select id="fi-avaliador" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
+      <div class="field"><label>Colaboradora</label><select id="fi-colaboradora" onchange="aplicarFiltrosDashboard()"><option value="">Todas</option></select></div>
+      <div class="field"><label>Lote</label><select id="fi-lote" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
     </div>
     <div class="g4" style="margin-bottom:10px;">
       <div class="field">
@@ -352,10 +361,10 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
           <div class="multisel-panel" id="fi-clone-panel"></div>
         </div>
       </div>
-      <div class="field"><label>CV</label><select id="fi-cv" onchange="renderDashboard()"><option value="">Todos</option></select></div>
-      <div class="field"><label>Canteiro</label><select id="fi-canteiro" onchange="renderDashboard()"><option value="">Todos</option></select></div>
+      <div class="field"><label>CV</label><select id="fi-cv" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
+      <div class="field"><label>Canteiro</label><select id="fi-canteiro" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
       <div class="field"><label>Espécie</label>
-        <select id="fi-especie" onchange="renderDashboard()">
+        <select id="fi-especie" onchange="aplicarFiltrosDashboard()">
           <option value="">Todas</option>
           <option value="Dunni">Dunni</option>
           <option value="Pinus">Pinus</option>
@@ -364,9 +373,14 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
         </select>
       </div>
     </div>
-    <div class="g3">
-      <div class="field"><label>Data início</label><input type="date" id="fi-data-ini" onchange="renderDashboard()"></div>
-      <div class="field"><label>Data fim</label><input type="date" id="fi-data-fim" onchange="renderDashboard()"></div>
+    <div class="g4">
+      <div class="field"><label>Idade (dias)</label>
+        <select id="fi-idade" onchange="aplicarFiltrosDashboard()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="field"><label>Data início</label><input type="date" id="fi-data-ini" onchange="aplicarFiltrosDashboard()"></div>
+      <div class="field"><label>Data fim</label><input type="date" id="fi-data-fim" onchange="aplicarFiltrosDashboard()"></div>
       <div class="field" style="justify-content:flex-end;"><button class="btn bs" onclick="limparFiltros()">Limpar filtros</button></div>
     </div>
   </div>
@@ -398,13 +412,14 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       <table id="tabela-dash">
         <thead><tr>
           <th>Data</th><th>Unidade</th><th>Avaliador</th><th>CV</th><th>Canteiro</th><th>Colaboradora</th>
-          <th>Clone</th><th>Data plantio</th><th>Lote</th><th>Plantadas</th><th>Mortas</th><th>Enraizadas</th>
+          <th>Clone</th><th>Data plantio</th><th>Idade (dias)</th><th>Lote</th><th>Plantadas</th><th>Mortas</th><th>Enraizadas</th><th>Sem raiz</th>
           <th>Enraiz. %</th><th>Sobrev. %</th>
         </tr></thead>
         <tbody id="tbody-dash"></tbody>
       </table>
     </div>
     <div class="empty" id="empty-dash" style="display:none;">Nenhum registro encontrado.</div>
+    <div class="pagination" id="pag-dash"></div>
   </div>
 </div>
 
@@ -554,7 +569,7 @@ function rowParaRegistro(row){
     id: row.id, data: row.data, unidade: row.unidade, avaliador: row.avaliador,
     cv: row.cv, canteiro: row.canteiro, colaboradora: row.colaboradora, colaboradoraNome: row.colaboradora_nome,
     clone: row.clone, plantio: row.plantio, lote: row.lote,
-    plantadas: row.plantadas, mortas: row.mortas, enraizadas: row.enraizadas,
+    plantadas: row.plantadas, mortas: row.mortas, enraizadas: row.enraizadas, semRaiz: row.sem_raiz,
     taxaEnraizamento: row.taxa_enraizamento, taxaSobrevivencia: row.taxa_sobrevivencia,
     obs: row.obs, criadoEm: row.criado_em
   };
@@ -564,7 +579,7 @@ function registroParaRow(r){
     data: r.data, unidade: r.unidade, avaliador: r.avaliador, cv: r.cv, canteiro: r.canteiro,
     colaboradora: r.colaboradora, colaboradora_nome: r.colaboradoraNome, clone: r.clone,
     plantio: r.plantio, lote: r.lote, plantadas: r.plantadas, mortas: r.mortas, enraizadas: r.enraizadas,
-    taxa_enraizamento: r.taxaEnraizamento, taxa_sobrevivencia: r.taxaSobrevivencia, obs: r.obs
+    sem_raiz: r.semRaiz, taxa_enraizamento: r.taxaEnraizamento, taxa_sobrevivencia: r.taxaSobrevivencia, obs: r.obs
   };
 }
 
@@ -1120,6 +1135,40 @@ function calcularTaxas(plantadas, mortas, enraizadas){
   return {enr, sob};
 }
 
+// Idade = dias entre a data de plantio e a data da avaliação. Calculada
+// sempre na hora (não fica salva no banco), então já vale automaticamente
+// para lançamentos antigos, sem precisar de nenhuma migração de dados.
+function calcularIdadeDias(dataAvaliacao, dataPlantio){
+  if(!dataAvaliacao || !dataPlantio) return null;
+  const d1 = new Date(dataAvaliacao+'T00:00:00');
+  const d2 = new Date(dataPlantio+'T00:00:00');
+  const diffMs = d1.getTime() - d2.getTime();
+  if(isNaN(diffMs)) return null;
+  return Math.round(diffMs / 86400000);
+}
+
+const FAIXAS_IDADE = [
+  {label:'5 a 10', min:5, max:10},
+  {label:'11 a 16', min:11, max:16},
+  {label:'17 a 22', min:17, max:22},
+  {label:'23 a 28', min:23, max:28},
+  {label:'29 a 34', min:29, max:34},
+  {label:'35 a 40', min:35, max:40},
+  {label:'41 a 46', min:41, max:46},
+  {label:'47 a 52', min:47, max:52},
+  {label:'53 a 58', min:53, max:58},
+  {label:'59 a 64', min:59, max:64},
+  {label:'65+', min:65, max:null},
+];
+
+function faixaDaIdade(idade){
+  if(idade===null || idade===undefined || isNaN(idade)) return null;
+  for(const f of FAIXAS_IDADE){
+    if(idade>=f.min && (f.max===null || idade<=f.max)) return f.label;
+  }
+  return null;
+}
+
 function atualizarTaxas(){
   const plantadas = parseInt(document.getElementById('f-plantadas').value)||0;
   const mortas = parseInt(document.getElementById('f-mortas').value)||0;
@@ -1188,6 +1237,7 @@ async function salvarLancamento(e){
     plantio: document.getElementById('f-plantio').value,
     lote: document.getElementById('f-lote').value.trim(),
     plantadas, mortas, enraizadas,
+    semRaiz: document.getElementById('f-sem-raiz').value === '' ? null : parseInt(document.getElementById('f-sem-raiz').value),
     taxaEnraizamento: enr, taxaSobrevivencia: sob,
     obs: document.getElementById('f-obs').value.trim()
   };
@@ -1212,6 +1262,7 @@ async function salvarLancamento(e){
   }
 
   await carregarLancamentos();
+  paginaLanc = 1;
   cancelarEdicao();
   if(foiEdicao){
     limparForm();
@@ -1239,6 +1290,7 @@ function editarLancamento(id){
   document.getElementById('f-plantadas').value = r.plantadas;
   document.getElementById('f-mortas').value = r.mortas;
   document.getElementById('f-enraizadas').value = r.enraizadas;
+  document.getElementById('f-sem-raiz').value = (r.semRaiz===null || r.semRaiz===undefined) ? '' : r.semRaiz;
   document.getElementById('f-obs').value = r.obs;
   atualizarTaxas();
   atualizarNomeColaboradora();
@@ -1260,6 +1312,7 @@ async function excluirLancamento(id){
   if(error){ avisoErroSupabase('excluir lançamento', error); return; }
   registrarEvento('lancamento_excluido', id, usuarioAtual?.email);
   await carregarLancamentos();
+  paginaLanc = 1;
   renderTudo();
 }
 
@@ -1277,15 +1330,16 @@ function limparForm(){
 
 // Mantém Data, Unidade, Avaliador, CV e Observações preenchidos para o próximo
 // lançamento; limpa apenas os campos específicos daquele lote/canteiro.
+// Mantém Data, Unidade, Avaliador, CV, Canteiro, Clone, Data de plantio e
+// Lote preenchidos para o próximo lançamento; limpa colaboradora, as
+// quantidades (plantadas/mortas/enraizadas/sem raiz) e observações.
 function limparParaProximoLancamento(){
-  document.getElementById('f-canteiro').value = '';
   document.getElementById('f-colaboradora').value = '';
-  document.getElementById('f-clone').value = '';
-  document.getElementById('f-plantio').value = '';
-  document.getElementById('f-lote').value = '';
   document.getElementById('f-plantadas').value = '';
   document.getElementById('f-mortas').value = '';
   document.getElementById('f-enraizadas').value = '';
+  document.getElementById('f-sem-raiz').value = '';
+  document.getElementById('f-obs').value = '';
   document.getElementById('rv-enr').textContent = '–';
   document.getElementById('rv-sob').textContent = '–';
   document.getElementById('warn-msg').classList.remove('visible');
@@ -1318,15 +1372,46 @@ function trocarAba(pageId, btn){
 }
 
 // ── RENDER TABELA DE LANÇAMENTOS ──────────────────────────────────
+// ── PAGINAÇÃO ──────────────────────────────────
+const ITENS_POR_PAGINA = 25;
+let paginaLanc = 1;
+let paginaDash = 1;
+
+function renderPaginacao(containerId, totalItens, paginaAtual, funcaoIrPara){
+  const cont = document.getElementById(containerId);
+  if(!cont) return;
+  const totalPaginas = Math.max(1, Math.ceil(totalItens/ITENS_POR_PAGINA));
+  if(totalPaginas<=1){ cont.innerHTML=''; return; }
+  cont.innerHTML = `
+    <button type="button" class="btn bs" ${paginaAtual<=1?'disabled':''} onclick="${funcaoIrPara}(${paginaAtual-1})">‹ Anterior</button>
+    <span class="pag-info">Página ${paginaAtual} de ${totalPaginas}</span>
+    <button type="button" class="btn bs" ${paginaAtual>=totalPaginas?'disabled':''} onclick="${funcaoIrPara}(${paginaAtual+1})">Próxima ›</button>
+  `;
+}
+
+function irParaPaginaLanc(n){
+  paginaLanc = n;
+  renderTabelaLanc();
+}
+function irParaPaginaDash(n){
+  paginaDash = n;
+  renderDashboard();
+}
+
 function renderTabelaLanc(){
   const tbody = document.getElementById('tbody-lanc');
   const ordenado = [...db].sort((a,b)=> b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
-  tbody.innerHTML = ordenado.map(r=>`
+  const totalPaginas = Math.max(1, Math.ceil(ordenado.length/ITENS_POR_PAGINA));
+  if(paginaLanc>totalPaginas) paginaLanc = totalPaginas;
+  if(paginaLanc<1) paginaLanc = 1;
+  const inicio = (paginaLanc-1)*ITENS_POR_PAGINA;
+  const pagina = ordenado.slice(inicio, inicio+ITENS_POR_PAGINA);
+  tbody.innerHTML = pagina.map(r=>`
     <tr>
       <td>${fmtData(r.data)}</td><td>${escapeHtml(r.unidade)}</td><td>${escapeHtml(r.avaliador)}</td>
       <td>${escapeHtml(r.cv)}</td><td>${escapeHtml(r.canteiro)}</td><td>${escapeHtml(r.colaboradora)}${r.colaboradoraNome? ' – '+escapeHtml(r.colaboradoraNome) : ''}</td>
-      <td>${escapeHtml(r.clone)}</td><td>${fmtData(r.plantio)}</td><td>${escapeHtml(r.lote)}</td>
-      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td>
+      <td>${escapeHtml(r.clone)}</td><td>${fmtData(r.plantio)}</td><td>${calcularIdadeDias(r.data,r.plantio) ?? ''}</td><td>${escapeHtml(r.lote)}</td>
+      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td><td>${r.semRaiz??''}</td>
       <td>${fmtPct(r.taxaEnraizamento)}</td><td>${fmtPct(r.taxaSobrevivencia)}</td>
       <td style="white-space:normal;max-width:180px;">${escapeHtml(r.obs)}</td>
       <td><div style="display:flex;gap:4px;">
@@ -1337,6 +1422,7 @@ function renderTabelaLanc(){
   document.getElementById('lanc-count').textContent = db.length+' registro'+(db.length!==1?'s':'');
   document.getElementById('empty-lanc').style.display = db.length ? 'none' : 'block';
   document.getElementById('tabela-lanc').style.display = db.length ? 'table' : 'none';
+  renderPaginacao('pag-lanc', ordenado.length, paginaLanc, 'irParaPaginaLanc');
 }
 
 function fmtData(iso){
@@ -1383,6 +1469,21 @@ function popularFiltros(){
     if(vals.includes(atual)) sel.value = atual;
   });
   renderClonePanel();
+  popularFiltroIdade();
+}
+
+// Só mostra as faixas de idade que realmente têm algum lançamento.
+function popularFiltroIdade(){
+  const sel = document.getElementById('fi-idade');
+  const atual = sel.value;
+  const presentes = new Set();
+  db.forEach(r=>{
+    const faixa = faixaDaIdade(calcularIdadeDias(r.data, r.plantio));
+    if(faixa) presentes.add(faixa);
+  });
+  const disponiveis = FAIXAS_IDADE.filter(f=>presentes.has(f.label));
+  sel.innerHTML = '<option value="">Todas</option>' + disponiveis.map(f=>`<option value="${f.label}">${f.label} dias</option>`).join('');
+  if(disponiveis.some(f=>f.label===atual)) sel.value = atual;
 }
 
 // ── DROPDOWN DE CLONE (seleção múltipla, uma linha) ──────────────────────
@@ -1410,7 +1511,7 @@ function onCloneOptionChange(clone, marcado){
     clonesFiltroSelecionados = clonesFiltroSelecionados.filter(c=>c!==clone);
   }
   atualizarLabelClone();
-  renderDashboard();
+  aplicarFiltrosDashboard();
 }
 
 function atualizarLabelClone(){
@@ -1433,11 +1534,19 @@ document.addEventListener('click', (e)=>{
 });
 
 function limparFiltros(){
-  ['fi-unidade','fi-avaliador','fi-colaboradora','fi-lote','fi-cv','fi-canteiro','fi-especie'].forEach(id=>document.getElementById(id).value='');
+  ['fi-unidade','fi-avaliador','fi-colaboradora','fi-lote','fi-cv','fi-canteiro','fi-especie','fi-idade'].forEach(id=>document.getElementById(id).value='');
   clonesFiltroSelecionados = [];
   renderClonePanel();
   document.getElementById('fi-data-ini').value='';
   document.getElementById('fi-data-fim').value='';
+  paginaDash = 1;
+  renderDashboard();
+}
+
+// Usada pelos filtros do dashboard: qualquer mudança de filtro volta pra
+// primeira página, pra não ficar numa página vazia por engano.
+function aplicarFiltrosDashboard(){
+  paginaDash = 1;
   renderDashboard();
 }
 
@@ -1450,6 +1559,7 @@ function getFiltrados(){
   const cv = document.getElementById('fi-cv').value;
   const ct = document.getElementById('fi-canteiro').value;
   const especie = document.getElementById('fi-especie').value;
+  const faixaIdade = document.getElementById('fi-idade').value;
   const dIni = document.getElementById('fi-data-ini').value;
   const dFim = document.getElementById('fi-data-fim').value;
 
@@ -1462,6 +1572,7 @@ function getFiltrados(){
     if(cv && String(r.cv)!==cv) return false;
     if(ct && String(r.canteiro)!==ct) return false;
     if(especie && getEspecie(r.clone)!==especie) return false;
+    if(faixaIdade && faixaDaIdade(calcularIdadeDias(r.data, r.plantio))!==faixaIdade) return false;
     if(dIni && r.data<dIni) return false;
     if(dFim && r.data>dFim) return false;
     return true;
@@ -1520,16 +1631,22 @@ function renderDashboard(){
 
   const tbody = document.getElementById('tbody-dash');
   const ordenado = [...filtrados].sort((a,b)=> b.data.localeCompare(a.data));
-  tbody.innerHTML = ordenado.map(r=>`
+  const totalPaginasDash = Math.max(1, Math.ceil(ordenado.length/ITENS_POR_PAGINA));
+  if(paginaDash>totalPaginasDash) paginaDash = totalPaginasDash;
+  if(paginaDash<1) paginaDash = 1;
+  const inicioDash = (paginaDash-1)*ITENS_POR_PAGINA;
+  const paginaAtual = ordenado.slice(inicioDash, inicioDash+ITENS_POR_PAGINA);
+  tbody.innerHTML = paginaAtual.map(r=>`
     <tr>
       <td>${fmtData(r.data)}</td><td>${escapeHtml(r.unidade)}</td><td>${escapeHtml(r.avaliador)}</td>
       <td>${escapeHtml(r.cv)}</td><td>${escapeHtml(r.canteiro)}</td><td>${escapeHtml(r.colaboradora)}${r.colaboradoraNome? ' – '+escapeHtml(r.colaboradoraNome) : ''}</td>
-      <td>${escapeHtml(r.clone)}</td><td>${fmtData(r.plantio)}</td><td>${escapeHtml(r.lote)}</td>
-      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td>
+      <td>${escapeHtml(r.clone)}</td><td>${fmtData(r.plantio)}</td><td>${calcularIdadeDias(r.data,r.plantio) ?? ''}</td><td>${escapeHtml(r.lote)}</td>
+      <td>${r.plantadas}</td><td>${r.mortas}</td><td>${r.enraizadas}</td><td>${r.semRaiz??''}</td>
       <td>${fmtPct(r.taxaEnraizamento)}</td><td>${fmtPct(r.taxaSobrevivencia)}</td>
     </tr>`).join('');
   document.getElementById('db-tab-count').textContent = filtrados.length+' registro'+(filtrados.length!==1?'s':'');
   document.getElementById('empty-dash').style.display = filtrados.length ? 'none' : 'block';
+  renderPaginacao('pag-dash', ordenado.length, paginaDash, 'irParaPaginaDash');
   document.getElementById('tabela-dash').style.display = filtrados.length ? 'table' : 'none';
 }
 
@@ -1539,8 +1656,8 @@ function exportarExcel(lista, nomeArquivo){
   const linhas = lista.map(r=>({
     'Data': fmtData(r.data), 'Unidade': r.unidade, 'Avaliador': r.avaliador,
     'CV': r.cv, 'Canteiro': r.canteiro, 'Nº Colaboradora': r.colaboradora, 'Nome da colaboradora': r.colaboradoraNome||'',
-    'Clone': r.clone, 'Data de plantio': fmtData(r.plantio), 'Lote': r.lote,
-    'Mudas plantadas': r.plantadas, 'Mudas mortas': r.mortas, 'Mudas enraizadas': r.enraizadas,
+    'Clone': r.clone, 'Data de plantio': fmtData(r.plantio), 'Idade (dias)': calcularIdadeDias(r.data, r.plantio) ?? '', 'Lote': r.lote,
+    'Mudas plantadas': r.plantadas, 'Mudas mortas': r.mortas, 'Mudas enraizadas': r.enraizadas, 'Sem raiz': r.semRaiz ?? '',
     'Taxa enraizamento (%)': r.taxaEnraizamento!==null? +r.taxaEnraizamento.toFixed(1) : '',
     'Taxa sobrevivência (%)': r.taxaSobrevivencia!==null? +r.taxaSobrevivencia.toFixed(1) : '',
     'Observações': r.obs||''
