@@ -32,6 +32,15 @@ header p{font-size:10px;opacity:.6;font-family:var(--mo);margin-top:1px;}
 nav{background:var(--sf);border-bottom:1px solid var(--brl);padding:0 1.5rem;display:flex;position:sticky;top:64px;z-index:99;}
 .nt{padding:11px 18px;border:none;background:transparent;font-family:var(--fn);font-size:13px;font-weight:500;cursor:pointer;color:var(--txm);border-bottom:3px solid transparent;margin-bottom:-1px;transition:color .15s;}
 .nt.active{color:var(--gm);border-bottom-color:var(--gm);}
+.subnav{display:flex;gap:8px;margin-bottom:1rem;border-bottom:1px solid var(--brl);}
+.snt{padding:9px 16px;border:none;background:transparent;font-family:var(--fn);font-size:12.5px;font-weight:500;cursor:pointer;color:var(--txm);border-bottom:3px solid transparent;margin-bottom:-1px;transition:color .15s;}
+.snt.active{color:var(--gm);border-bottom-color:var(--gm);}
+.subpage{display:none;}
+.subpage.active{display:block;}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-weight:700;font-size:12px;font-family:var(--mo);}
+.rank-badge.r1{background:#F6E4A8;color:#8A6D1D;}
+.rank-badge.r2{background:#E3E3E0;color:#5C5C58;}
+.rank-badge.r3{background:#EFCBAE;color:#8A4A22;}
 .page{display:none;padding:1.25rem 1.5rem 4rem;max-width:1200px;margin:0 auto;}
 .page.active{display:block;}
 .card{background:var(--sf);border:1px solid var(--brl);border-radius:var(--rl2);padding:1.25rem;margin-bottom:1rem;}
@@ -404,41 +413,72 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     </div>
   </div>
 
-  <div class="metrics">
-    <div class="metric"><div class="ml">Lançamentos</div><div class="mv" id="db-count">0</div></div>
-    <div class="metric"><div class="ml">Mudas plantadas</div><div class="mv" id="db-plantadas">0</div></div>
-    <div class="metric"><div class="ml">Mudas mortas</div><div class="mv" id="db-mortas">0</div></div>
-    <div class="metric"><div class="ml">Mudas enraizadas</div><div class="mv" id="db-enraizadas">0</div></div>
-    <div class="metric"><div class="ml">Taxa enraizamento méd.</div><div class="mv g" id="db-taxa-enr">–</div></div>
-    <div class="metric"><div class="ml">Taxa sobrevivência méd.</div><div class="mv b" id="db-taxa-sob">–</div></div>
+  <div class="subnav">
+    <button class="snt active" data-sub="dash-geral" onclick="trocarSubDash('dash-geral',this)">Visão geral</button>
+    <button class="snt" data-sub="dash-ranking" onclick="trocarSubDash('dash-ranking',this)">Ranking de colaboradoras</button>
   </div>
 
-  <div class="card">
-    <div class="ct">Enraizamento e sobrevivência ao longo do tempo</div>
-    <div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div>
-    <div class="empty" id="empty-chart" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
-  </div>
+  <div class="subpage active" id="dash-geral">
+    <div class="metrics">
+      <div class="metric"><div class="ml">Lançamentos</div><div class="mv" id="db-count">0</div></div>
+      <div class="metric"><div class="ml">Mudas plantadas</div><div class="mv" id="db-plantadas">0</div></div>
+      <div class="metric"><div class="ml">Mudas mortas</div><div class="mv" id="db-mortas">0</div></div>
+      <div class="metric"><div class="ml">Mudas enraizadas</div><div class="mv" id="db-enraizadas">0</div></div>
+      <div class="metric"><div class="ml">Taxa enraizamento méd.</div><div class="mv g" id="db-taxa-enr">–</div></div>
+      <div class="metric"><div class="ml">Taxa sobrevivência méd.</div><div class="mv b" id="db-taxa-sob">–</div></div>
+    </div>
 
-  <div class="card">
-    <div class="ltb">
-      <div class="ct" style="margin-bottom:0;">Registros filtrados</div>
-      <div class="xb">
-        <span class="lc" id="db-tab-count">0 registros</span>
-        <button class="btn be" style="padding:5px 12px;font-size:11px;" onclick="exportarExcel(getFiltrados(),'dashboard_enraizamento')">Exportar Excel</button>
+    <div class="card">
+      <div class="ct">Enraizamento e sobrevivência ao longo do tempo</div>
+      <div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div>
+      <div class="empty" id="empty-chart" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
+    </div>
+
+    <div class="card">
+      <div class="ltb">
+        <div class="ct" style="margin-bottom:0;">Registros filtrados</div>
+        <div class="xb">
+          <span class="lc" id="db-tab-count">0 registros</span>
+          <button class="btn be" style="padding:5px 12px;font-size:11px;" onclick="exportarExcel(getFiltrados(),'dashboard_enraizamento')">Exportar Excel</button>
+        </div>
       </div>
+      <div class="tw">
+        <table id="tabela-dash">
+          <thead><tr>
+            <th>Data</th><th>Unidade</th><th>Avaliador</th><th>CV</th><th>Canteiro</th><th>Colaboradora</th>
+            <th>Clone</th><th>Data plantio</th><th>Idade (dias)</th><th>Lote</th><th>Plantadas</th><th>Mortas</th><th>Enraizadas</th><th>Sem raiz</th>
+            <th>Enraiz. %</th><th>Sobrev. %</th>
+          </tr></thead>
+          <tbody id="tbody-dash"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="empty-dash" style="display:none;">Nenhum registro encontrado.</div>
+      <div class="pagination" id="pag-dash"></div>
     </div>
-    <div class="tw">
-      <table id="tabela-dash">
-        <thead><tr>
-          <th>Data</th><th>Unidade</th><th>Avaliador</th><th>CV</th><th>Canteiro</th><th>Colaboradora</th>
-          <th>Clone</th><th>Data plantio</th><th>Idade (dias)</th><th>Lote</th><th>Plantadas</th><th>Mortas</th><th>Enraizadas</th><th>Sem raiz</th>
-          <th>Enraiz. %</th><th>Sobrev. %</th>
-        </tr></thead>
-        <tbody id="tbody-dash"></tbody>
-      </table>
+  </div>
+
+  <div class="subpage" id="dash-ranking">
+    <div class="card">
+      <div class="ltb">
+        <div class="ct" style="margin-bottom:0;">Ranking de colaboradoras por taxa de enraizamento</div>
+        <div class="xb">
+          <span class="lc" id="ranking-count">0 colaboradoras</span>
+          <button class="btn be" style="padding:5px 12px;font-size:11px;" onclick="exportarExcelRanking()">Exportar Excel</button>
+        </div>
+      </div>
+      <div class="ms" style="margin-bottom:.75rem;">Considera os mesmos filtros da aba "Visão geral" (unidade, clone, período, faixa de idade etc). Ordenado pela taxa de enraizamento média (mudas enraizadas ÷ mudas plantadas), da melhor para a pior.</div>
+      <div class="tw">
+        <table id="tabela-ranking">
+          <thead><tr>
+            <th>#</th><th>Colaboradora</th><th>Unidade</th><th>Lançamentos</th>
+            <th>Plantadas</th><th>Enraizadas</th><th>Taxa enraizamento méd.</th><th>Taxa sobrevivência méd.</th>
+          </tr></thead>
+          <tbody id="tbody-ranking"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="empty-ranking" style="display:none;">Nenhum lançamento com colaboradora identificada para o filtro selecionado.</div>
+      <div class="pagination" id="pag-ranking"></div>
     </div>
-    <div class="empty" id="empty-dash" style="display:none;">Nenhum registro encontrado.</div>
-    <div class="pagination" id="pag-dash"></div>
   </div>
 </div>
 
@@ -1432,6 +1472,7 @@ function trocarAba(pageId, btn){
 const ITENS_POR_PAGINA = 25;
 let paginaLanc = 1;
 let paginaDash = 1;
+let paginaRanking = 1;
 
 function renderPaginacao(containerId, totalItens, paginaAtual, funcaoIrPara){
   const cont = document.getElementById(containerId);
@@ -1704,6 +1745,116 @@ function renderDashboard(){
   document.getElementById('empty-dash').style.display = filtrados.length ? 'none' : 'block';
   renderPaginacao('pag-dash', ordenado.length, paginaDash, 'irParaPaginaDash');
   document.getElementById('tabela-dash').style.display = filtrados.length ? 'table' : 'none';
+
+  renderRanking();
+}
+
+// ── SUB-ABAS DO DASHBOARD (Visão geral / Ranking) ──────────────────────
+function trocarSubDash(subId, btn){
+  document.querySelectorAll('#page-dashboard .subpage').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#page-dashboard .snt').forEach(n=>n.classList.remove('active'));
+  document.getElementById(subId).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── RANKING DE COLABORADORAS ──────────────────────────────
+// Agrupa os lançamentos já filtrados (mesmos filtros da Visão geral,
+// incluindo a faixa de idade) por colaboradora dentro de cada unidade, e
+// ordena da maior para a menor taxa de enraizamento média ponderada
+// (soma de enraizadas ÷ soma de plantadas), não a média simples das taxas
+// de cada lançamento — isso evita que um único lançamento pequeno distorça
+// o resultado de uma colaboradora com muito mais volume.
+let rankingListaAtual = [];
+
+function calcularRanking(){
+  const filtrados = getFiltrados();
+  const grupos = {};
+  filtrados.forEach(r=>{
+    if(!r.colaboradora) return;
+    const chave = r.unidade+'||'+r.colaboradora;
+    if(!grupos[chave]){
+      grupos[chave] = {
+        unidade: r.unidade, colaboradora: r.colaboradora, colaboradoraNome: r.colaboradoraNome||'',
+        lancamentos: 0, plantadas: 0, mortas: 0, enraizadas: 0
+      };
+    }
+    const g = grupos[chave];
+    g.lancamentos++;
+    g.plantadas += (r.plantadas||0);
+    g.mortas += (r.mortas||0);
+    g.enraizadas += (r.enraizadas||0);
+    if(!g.colaboradoraNome && r.colaboradoraNome) g.colaboradoraNome = r.colaboradoraNome;
+  });
+
+  return Object.values(grupos).map(g=>({
+    ...g,
+    taxaEnraizamento: g.plantadas ? (g.enraizadas/g.plantadas)*100 : null,
+    taxaSobrevivencia: g.plantadas ? ((g.plantadas-g.mortas)/g.plantadas)*100 : null
+  })).sort((a,b)=>{
+    const ta = a.taxaEnraizamento===null ? -1 : a.taxaEnraizamento;
+    const tb = b.taxaEnraizamento===null ? -1 : b.taxaEnraizamento;
+    return tb - ta;
+  });
+}
+
+function renderRanking(){
+  rankingListaAtual = calcularRanking();
+  const lista = rankingListaAtual;
+
+  document.getElementById('ranking-count').textContent = lista.length+' colaboradora'+(lista.length!==1?'s':'');
+  document.getElementById('empty-ranking').style.display = lista.length ? 'none' : 'block';
+  document.getElementById('tabela-ranking').style.display = lista.length ? 'table' : 'none';
+
+  const totalPaginasRanking = Math.max(1, Math.ceil(lista.length/ITENS_POR_PAGINA));
+  if(paginaRanking>totalPaginasRanking) paginaRanking = totalPaginasRanking;
+  if(paginaRanking<1) paginaRanking = 1;
+  const inicioR = (paginaRanking-1)*ITENS_POR_PAGINA;
+  const paginaAtualRanking = lista.slice(inicioR, inicioR+ITENS_POR_PAGINA);
+
+  const tbody = document.getElementById('tbody-ranking');
+  tbody.innerHTML = paginaAtualRanking.map((g, idx)=>{
+    const posicao = inicioR+idx+1;
+    const badge = posicao===1 ? '<span class="rank-badge r1">1</span>'
+      : posicao===2 ? '<span class="rank-badge r2">2</span>'
+      : posicao===3 ? '<span class="rank-badge r3">3</span>'
+      : posicao;
+    return `<tr>
+      <td>${badge}</td>
+      <td>${escapeHtml(g.colaboradora)}${g.colaboradoraNome? ' – '+escapeHtml(g.colaboradoraNome) : ''}</td>
+      <td>${escapeHtml(g.unidade)}</td>
+      <td>${g.lancamentos}</td>
+      <td>${g.plantadas}</td>
+      <td>${g.enraizadas}</td>
+      <td>${fmtPct(g.taxaEnraizamento)}</td>
+      <td>${fmtPct(g.taxaSobrevivencia)}</td>
+    </tr>`;
+  }).join('');
+
+  renderPaginacao('pag-ranking', lista.length, paginaRanking, 'irParaPaginaRanking');
+}
+
+function irParaPaginaRanking(n){
+  paginaRanking = n;
+  renderRanking();
+}
+
+function exportarExcelRanking(){
+  if(!rankingListaAtual.length){ alert('Não há dados para exportar.'); return; }
+  const linhas = rankingListaAtual.map((g,idx)=>({
+    'Posição': idx+1,
+    'Nº Colaboradora': g.colaboradora,
+    'Nome': g.colaboradoraNome||'',
+    'Unidade': g.unidade,
+    'Lançamentos': g.lancamentos,
+    'Mudas plantadas': g.plantadas,
+    'Mudas enraizadas': g.enraizadas,
+    'Taxa de enraizamento média (%)': g.taxaEnraizamento!==null ? +g.taxaEnraizamento.toFixed(1) : '',
+    'Taxa de sobrevivência média (%)': g.taxaSobrevivencia!==null ? +g.taxaSobrevivencia.toFixed(1) : ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ranking');
+  XLSX.writeFile(wb, 'ranking_colaboradoras_'+hoje()+'.xlsx');
 }
 
 // ── EXPORTAR EXCEL ──────────────────────────────────
