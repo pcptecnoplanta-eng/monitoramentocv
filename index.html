@@ -302,22 +302,22 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       </div>
 
       <div class="g3" style="margin-bottom:10px;">
-        <div class="field"><label>CV</label><input type="number" id="f-cv" min="0" step="1" placeholder="Número" required></div>
+        <div class="field"><label>CV</label><input type="text" id="f-cv" maxlength="13" placeholder="Até 13 caracteres" required></div>
         <div class="field"><label>Canteiro</label><input type="number" id="f-canteiro" min="0" step="1" placeholder="Número" required></div>
-        <div class="field"><label>Nº da colaboradora</label>
-          <input type="text" id="f-colaboradora" list="dl-colaboradora" required oninput="atualizarNomeColaboradora()">
-          <div class="ms" id="colaboradora-nome-display"></div>
-        </div>
-      </div>
-
-      <div class="g3" style="margin-bottom:10px;">
         <div class="field"><label>Clone</label>
           <select id="f-clone" required disabled onchange="atualizarNomeColaboradora()">
             <option value="">Selecione a unidade primeiro</option>
           </select>
         </div>
+      </div>
+
+      <div class="g3" style="margin-bottom:10px;">
         <div class="field"><label>Data de plantio</label><input type="date" id="f-plantio" required></div>
         <div class="field"><label>Lote</label><input type="text" id="f-lote" list="dl-lote" required></div>
+        <div class="field"><label>Nº da colaboradora</label>
+          <input type="text" id="f-colaboradora" list="dl-colaboradora" required oninput="atualizarNomeColaboradora()">
+          <div class="ms" id="colaboradora-nome-display"></div>
+        </div>
       </div>
 
       <div class="g3" style="margin-bottom:6px;">
