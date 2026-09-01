@@ -435,6 +435,13 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     </div>
 
     <div class="card">
+      <div class="ct">Enraizamento e sobrevivência por lote</div>
+      <div class="ms" style="margin-bottom:.5rem;">Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente).</div>
+      <div class="chart-wrap"><canvas id="chart-lote"></canvas></div>
+      <div class="empty" id="empty-chart-lote" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
+    </div>
+
+    <div class="card">
       <div class="ltb">
         <div class="ct" style="margin-bottom:0;">Registros filtrados</div>
         <div class="xb">
@@ -596,6 +603,7 @@ let config = {clones:{}, colaboradoras:{}};
 UNIDADES.forEach(u=>{ config.clones[u] = []; config.colaboradoras[u] = {}; });
 let editandoId = null;
 let chartEvolucao = null;
+let chartLote = null;
 
 function avisoErroSupabase(acao, error){
   console.error(acao, error);
@@ -1721,6 +1729,50 @@ function renderDashboard(){
       options:{
         responsive:true, maintainAspectRatio:false,
         scales:{ y:{ min:0, max:100, ticks:{ callback:v=>v+'%' } } },
+        plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label: ctx=> ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%' } } }
+      }
+    });
+  }
+
+  // agrupar por lote (soma ponderada por lote), ordenado pela data de
+  // plantio mais antiga de cada lote (do mais antigo à esquerda ao mais
+  // novo à direita)
+  const porLote = {};
+  filtrados.forEach(r=>{
+    if(!r.lote) return;
+    if(!porLote[r.lote]) porLote[r.lote] = {plant:0, mort:0, enr:0, plantioMin: r.plantio||null};
+    const g = porLote[r.lote];
+    g.plant += r.plantadas;
+    g.mort += r.mortas;
+    g.enr += r.enraizadas;
+    if(r.plantio && (!g.plantioMin || r.plantio < g.plantioMin)) g.plantioMin = r.plantio;
+  });
+  const lotes = Object.keys(porLote).sort((a,b)=>{
+    const da = porLote[a].plantioMin || '9999-99-99';
+    const db = porLote[b].plantioMin || '9999-99-99';
+    return da.localeCompare(db);
+  });
+  const serieEnrLote = lotes.map(l=> porLote[l].plant ? (porLote[l].enr/porLote[l].plant)*100 : null);
+  const serieSobLote = lotes.map(l=> porLote[l].plant ? ((porLote[l].plant-porLote[l].mort)/porLote[l].plant)*100 : null);
+
+  document.getElementById('empty-chart-lote').style.display = lotes.length ? 'none' : 'block';
+  const canvasLote = document.getElementById('chart-lote');
+  canvasLote.style.display = lotes.length ? 'block' : 'none';
+
+  if(chartLote) chartLote.destroy();
+  if(lotes.length){
+    chartLote = new Chart(canvasLote, {
+      type:'line',
+      data:{
+        labels: lotes,
+        datasets:[
+          {label:'Enraizamento (%)', data: serieEnrLote, borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3},
+          {label:'Sobrevivência (%)', data: serieSobLote, borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{ y:{ min:0, max:100, ticks:{ callback:v=>v+'%' } }, x:{ title:{ display:true, text:'Lote (plantio mais antigo → mais recente)' } } },
         plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label: ctx=> ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%' } } }
       }
     });
