@@ -27,7 +27,7 @@
     # comum de exfiltração, que é carregar um script de um domínio externo.
     # Para fechar esse último ponto seria preciso reescrever os onclick
     # para addEventListener, o que é uma refatoração maior.
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://lhqurcddiycmacojvfnh.supabase.co https://api.open-meteo.com https://archive-api.open-meteo.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://lhqurcddiycmacojvfnh.supabase.co https://awbyfboedszwczukxqzo.supabase.co https://api.open-meteo.com https://archive-api.open-meteo.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
     # Força HTTPS no navegador por 1 ano, incluindo subdomínios
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
