@@ -543,9 +543,13 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   <div class="card">
     <div class="ct">Planilha de Registro de Produção</div>
     <div class="ms" style="margin-bottom:1rem;">
-      Envie o arquivo <strong>Registro de Produção (.xlsb / .xlsx)</strong>. O app lê a aba
+      Envie o arquivo <strong>Registro de Produção</strong> em <strong>.xlsx</strong>. O app lê a aba
       <strong>"Rel Geral"</strong> e extrai, para cada lote, o enraizamento ponderado da coluna
       <strong>N (ENR %)</strong>. Cada novo envio substitui completamente o anterior.
+      <br><br>
+      Se o seu arquivo é <strong>.xlsb</strong>, abra-o no Excel e use <em>Arquivo → Salvar como →
+      Pasta de Trabalho do Excel (*.xlsx)</em> antes de enviar: alguns .xlsb usam recursos internos
+      que não conseguimos ler no navegador.
     </div>
     <div class="g2" style="align-items:end;">
       <div class="field">
@@ -2254,7 +2258,22 @@ function localizarColunasRelGeral(linhas){
 }
 
 function processarPlanilha(arrayBuffer){
-  const wb = XLSX.read(new Uint8Array(arrayBuffer), {type:'array'});
+  let wb;
+  try{
+    wb = XLSX.read(new Uint8Array(arrayBuffer), {type:'array'});
+  }catch(e){
+    // Alguns arquivos .xlsb usam recursos que a biblioteca de leitura não
+    // suporta (ex.: "Bad SerAr"). Nesses casos, salvar como .xlsx no Excel
+    // resolve, porque o .xlsx é totalmente suportado.
+    const ehXlsb = /\.xlsb$/i.test(arquivoPlanilha ? arquivoPlanilha.name : '');
+    if(ehXlsb){
+      throw new Error('Não foi possível ler este arquivo .xlsb (' + e.message + '). '
+        + 'Abra a planilha no Excel e use "Salvar como" escolhendo "Pasta de Trabalho do Excel (*.xlsx)", '
+        + 'depois envie o .xlsx aqui.');
+    }
+    throw new Error('Não foi possível ler o arquivo: '+e.message);
+  }
+
   const nomeAba = wb.SheetNames.find(n=> n.trim().toLowerCase()==='rel geral');
   if(!nomeAba) throw new Error('A aba "Rel Geral" não foi encontrada nesta planilha.');
 
