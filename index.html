@@ -37,6 +37,13 @@ nav{background:var(--sf);border-bottom:1px solid var(--brl);padding:0 1.5rem;dis
 .snt.active{color:var(--gm);border-bottom-color:var(--gm);}
 .subpage{display:none;}
 .subpage.active{display:block;}
+.filtro-grupo{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gm);margin-bottom:6px;padding-bottom:3px;border-bottom:1px solid var(--brl);}
+.filtro-rodape{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+.stepper{display:flex;align-items:stretch;gap:0;}
+.stepper input{border-radius:0;text-align:center;border-left:none;border-right:none;min-width:0;}
+.stepper .btn{padding:0 12px;font-size:16px;line-height:1;font-weight:600;flex:0 0 auto;}
+.stepper .btn:first-child{border-radius:var(--r) 0 0 var(--r);}
+.stepper .btn:last-child{border-radius:0 var(--r) var(--r) 0;}
 .rank-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-weight:700;font-size:12px;font-family:var(--mo);}
 .rank-badge.r1{background:#F6E4A8;color:#8A6D1D;}
 .rank-badge.r2{background:#E3E3E0;color:#5C5C58;}
@@ -372,13 +379,23 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 
   <div class="card">
     <div class="ct">Filtros</div>
-    <div class="g4" style="margin-bottom:10px;">
+
+    <div class="filtro-grupo">Identificação</div>
+    <div class="g4" style="margin-bottom:12px;">
       <div class="field"><label>Unidade</label><select id="fi-unidade" onchange="aplicarFiltrosDashboard()"><option value="">Todas</option></select></div>
       <div class="field"><label>Avaliador</label><select id="fi-avaliador" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
       <div class="field"><label>Colaboradora</label><select id="fi-colaboradora" onchange="aplicarFiltrosDashboard()"><option value="">Todas</option></select></div>
-      <div class="field"><label>Lote</label><select id="fi-lote" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
+      <div class="field"><label>Mín. lançamentos por colaboradora</label>
+        <div class="stepper">
+          <button type="button" class="btn bs" onclick="ajustarMinLanc(-1)" aria-label="Diminuir">−</button>
+          <input type="number" id="fi-min-lanc" min="0" step="1" value="0" onchange="aplicarFiltrosDashboard()" oninput="aplicarFiltrosDashboard()">
+          <button type="button" class="btn bs" onclick="ajustarMinLanc(1)" aria-label="Aumentar">+</button>
+        </div>
+      </div>
     </div>
-    <div class="g4" style="margin-bottom:10px;">
+
+    <div class="filtro-grupo">Material e local</div>
+    <div class="g4" style="margin-bottom:12px;">
       <div class="field">
         <label>Clone</label>
         <div class="multisel" id="fi-clone-wrap">
@@ -389,8 +406,6 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
           <div class="multisel-panel" id="fi-clone-panel"></div>
         </div>
       </div>
-      <div class="field"><label>CV</label><select id="fi-cv" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
-      <div class="field"><label>Canteiro</label><select id="fi-canteiro" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
       <div class="field"><label>Espécie</label>
         <select id="fi-especie" onchange="aplicarFiltrosDashboard()">
           <option value="">Todas</option>
@@ -400,33 +415,36 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
           <option value="Eucalipto">Eucalipto</option>
         </select>
       </div>
+      <div class="field"><label>Lote</label><select id="fi-lote" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
+      <div class="g2" style="gap:8px;">
+        <div class="field"><label>CV</label><select id="fi-cv" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
+        <div class="field"><label>Canteiro</label><select id="fi-canteiro" onchange="aplicarFiltrosDashboard()"><option value="">Todos</option></select></div>
+      </div>
     </div>
-    <div class="g4">
-      <div class="field"><label>Idade (dias)</label>
+
+    <div class="filtro-grupo">Período</div>
+    <div class="g4" style="margin-bottom:12px;">
+      <div class="field"><label>Avaliação — início</label><input type="date" id="fi-data-ini" onchange="aplicarFiltrosDashboard()"></div>
+      <div class="field"><label>Avaliação — fim</label><input type="date" id="fi-data-fim" onchange="aplicarFiltrosDashboard()"></div>
+      <div class="field"><label>Plantio — início</label><input type="date" id="fi-plantio-ini" onchange="aplicarFiltrosDashboard()"></div>
+      <div class="field"><label>Plantio — fim</label><input type="date" id="fi-plantio-fim" onchange="aplicarFiltrosDashboard()"></div>
+    </div>
+
+    <div class="filtro-grupo">Idade e atalhos</div>
+    <div class="filtro-rodape">
+      <div class="field" style="max-width:220px;"><label>Idade (dias)</label>
         <select id="fi-idade" onchange="aplicarFiltrosDashboard()">
           <option value="">Todas</option>
         </select>
       </div>
-      <div class="field"><label>Avaliação — início</label><input type="date" id="fi-data-ini" onchange="aplicarFiltrosDashboard()"></div>
-      <div class="field"><label>Avaliação — fim</label><input type="date" id="fi-data-fim" onchange="aplicarFiltrosDashboard()"></div>
-      <div></div>
-    </div>
-    <div class="g4">
-      <div class="field"><label>Plantio — início</label><input type="date" id="fi-plantio-ini" onchange="aplicarFiltrosDashboard()"></div>
-      <div class="field"><label>Plantio — fim</label><input type="date" id="fi-plantio-fim" onchange="aplicarFiltrosDashboard()"></div>
-      <div class="field"><label>Mín. de lançamentos por colaboradora</label>
-        <input type="number" id="fi-min-lanc" min="0" step="1" value="0" onchange="aplicarFiltrosDashboard()" oninput="aplicarFiltrosDashboard()">
-      </div>
-      <div class="field" style="justify-content:flex-end;"><button class="btn bs" onclick="limparFiltros()">Limpar filtros</button></div>
-    </div>
-    <div style="margin-top:10px;">
-      <label class="chk-label">
+      <label class="chk-label" style="margin-top:0;">
         <input type="checkbox" id="fi-semana-antigos" onchange="aplicarFiltrosDashboard()">
         <span class="box"></span>
         Semana anterior — 15 plantios mais antigos
       </label>
-      <div class="ms" id="fi-semana-info" style="margin-left:24px;"></div>
+      <button class="btn bs" style="margin-left:auto;" onclick="limparFiltros()">Limpar filtros</button>
     </div>
+    <div class="ms" id="fi-semana-info" style="margin-top:6px;"></div>
   </div>
 
   <div class="subnav">
@@ -445,59 +463,29 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     </div>
 
     <div class="card">
-      <div class="ct">Enraizamento e sobrevivência por data de avaliação</div>
-      <div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div>
-      <div class="empty" id="empty-chart" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
-    </div>
-
-    <div class="card">
       <div class="ltb">
-        <div class="ct" style="margin-bottom:0;">Enraizamento e sobrevivência por data de plantio</div>
-        <label class="chk-label" style="margin-top:0;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <label style="margin:0;white-space:nowrap;">Ponderado por:</label>
+          <select id="gr-modo" onchange="renderGraficoPrincipal(getFiltrados())" style="width:auto;padding:6px 10px;">
+            <option value="data">Data de avaliação</option>
+            <option value="plantio">Data de plantio</option>
+            <option value="lote">Lote</option>
+            <option value="mes">Mês de avaliação</option>
+            <option value="mes_plantio">Mês de plantio</option>
+            <option value="clone">Clone (mensal)</option>
+            <option value="colaboradora">Colaboradora (mensal)</option>
+          </select>
+        </div>
+        <label class="chk-label" style="margin-top:0;" id="ck-clima-wrap">
           <input type="checkbox" id="ck-clima" onchange="onToggleClima()">
           <span class="box"></span>
-          Mostrar clima da unidade (temp. máx/mín e chuva)
+          Mostrar clima da unidade
         </label>
       </div>
-      <div class="chart-wrap"><canvas id="chart-plantio"></canvas></div>
+      <div class="ms" id="gr-descricao" style="margin-bottom:.5rem;"></div>
+      <div class="chart-wrap"><canvas id="chart-principal"></canvas></div>
       <div class="ms" id="clima-status" style="margin-top:.5rem;"></div>
-      <div class="empty" id="empty-chart-plantio" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
-    </div>
-
-    <div class="card">
-      <div class="ltb">
-        <div class="ct" style="margin-bottom:0;">Enraizamento e sobrevivência por lote</div>
-        <label class="chk-label" style="margin-top:0;">
-          <input type="checkbox" id="ck-clima-lote" onchange="onToggleClimaLote()">
-          <span class="box"></span>
-          Mostrar clima da unidade (no dia de plantio do lote)
-        </label>
-      </div>
-      <div class="ms" style="margin-bottom:.5rem;">Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente).</div>
-      <div class="chart-wrap"><canvas id="chart-lote"></canvas></div>
-      <div class="ms" id="clima-status-lote" style="margin-top:.5rem;"></div>
-      <div class="empty" id="empty-chart-lote" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
-    </div>
-
-    <div class="card">
-      <div class="ct">Enraizamento mensal por clone</div>
-      <div class="ms" style="margin-bottom:.5rem;">Taxa ponderada por mês de avaliação. Mostra até 10 clones com maior volume de mudas.</div>
-      <div class="chart-wrap"><canvas id="chart-mes-clone"></canvas></div>
-      <div class="empty" id="empty-mes-clone" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
-    </div>
-
-    <div class="card">
-      <div class="ct">Enraizamento mensal por colaboradora</div>
-      <div class="ms" style="margin-bottom:.5rem;">Taxa ponderada por mês de avaliação. Mostra até 10 colaboradoras com maior volume de mudas.</div>
-      <div class="chart-wrap"><canvas id="chart-mes-colab"></canvas></div>
-      <div class="empty" id="empty-mes-colab" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
-    </div>
-
-    <div class="card">
-      <div class="ct">Enraizamento mensal por mês de plantio</div>
-      <div class="ms" style="margin-bottom:.5rem;">Taxa ponderada, agrupada pelo mês em que as mudas foram plantadas.</div>
-      <div class="chart-wrap"><canvas id="chart-mes-plantio"></canvas></div>
-      <div class="empty" id="empty-mes-plantio" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
+      <div class="empty" id="empty-chart" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
     </div>
 
     <div class="card">
@@ -661,12 +649,7 @@ let db = [];
 let config = {clones:{}, colaboradoras:{}};
 UNIDADES.forEach(u=>{ config.clones[u] = []; config.colaboradoras[u] = {}; });
 let editandoId = null;
-let chartEvolucao = null;
-let chartLote = null;
-let chartPlantio = null;
-let chartMesClone = null;
-let chartMesColab = null;
-let chartMesPlantio = null;
+let chartPrincipal = null;
 
 // ── CLIMA (Open-Meteo — API pública, não exige chave) ──────────────────
 // Coordenadas fixas de cada unidade (convertidas de graus/minutos/segundos).
@@ -681,25 +664,26 @@ let climaCache = {};   // 'lat,lon|inicio|fim' -> {datas:{}, erro:null}
 let climaDados = null; // dados do range atualmente exibido
 let climaRangeCarregado = null;
 
-// O clima depende de qual unidade está filtrada: as unidades ficam a
-// milhares de km de distância, então não faz sentido mostrar um clima
-// "médio". Se nenhuma unidade estiver selecionada, devolve null e o
-// gráfico avisa para escolher uma.
+// Qual unidade usar para o clima. Prioridade:
+// 1) a unidade escolhida no filtro;
+// 2) se o filtro está em "Todas" mas todos os lançamentos exibidos são de
+//    uma única unidade, usa essa — não há ambiguidade nesse caso.
 function getUnidadeClima(){
-  return document.getElementById('fi-unidade').value || 'nenhuma';
+  const doFiltro = document.getElementById('fi-unidade').value;
+  if(doFiltro) return doFiltro;
+  const unidades = [...new Set(getFiltrados().map(r=>r.unidade).filter(Boolean))];
+  return unidades.length === 1 ? unidades[0] : 'nenhuma';
 }
 
 function getCoordenadasClima(){
-  const unidade = document.getElementById('fi-unidade').value;
-  if(!unidade) return null;
-  return COORDS_UNIDADE[unidade] || null;
+  return COORDS_UNIDADE[getUnidadeClima()] || null;
 }
 
 // Busca temperatura máx/mín e chuva diária. A API de forecast cobre até
 // ~92 dias no passado; para datas mais antigas usamos a API de arquivo.
 async function buscarClima(dataInicio, dataFim){
   const coords = getCoordenadasClima();
-  if(!coords) return {datas:{}, erro:'Selecione uma unidade no filtro para ver o clima (cada unidade tem sua própria localização).'};
+  if(!coords) return {datas:{}, erro:'Os dados exibidos são de mais de uma unidade. Filtre por uma unidade para ver o clima (cada uma tem sua própria localização).'};
   const {lat, lon} = coords;
   const chave = lat+','+lon+'|'+dataInicio+'|'+dataFim;
   if(climaCache[chave]) return climaCache[chave];
@@ -734,35 +718,14 @@ async function buscarClima(dataInicio, dataFim){
   }
 }
 
-// O clima é compartilhado pelos dois gráficos (plantio e lote): os dois
-// usam as mesmas datas de plantio, então uma única busca serve para ambos.
-function climaAtivo(){
-  const a = document.getElementById('ck-clima');
-  const b = document.getElementById('ck-clima-lote');
-  return (a && a.checked) || (b && b.checked);
-}
-
-function limparClimaSeDesligado(){
-  if(!climaAtivo()){
+// Liga/desliga as séries de clima no gráfico principal.
+function onToggleClima(){
+  if(!document.getElementById('ck-clima').checked){
     climaDados = null;
     climaRangeCarregado = null;
     document.getElementById('clima-status').textContent = '';
-    document.getElementById('clima-status-lote').textContent = '';
   }
-}
-
-function onToggleClima(){
-  limparClimaSeDesligado();
-  const filtrados = getFiltrados();
-  renderGraficosExtras(filtrados);
-  renderGraficoLote(filtrados);
-}
-
-function onToggleClimaLote(){
-  limparClimaSeDesligado();
-  const filtrados = getFiltrados();
-  renderGraficosExtras(filtrados);
-  renderGraficoLote(filtrados);
+  renderGraficoPrincipal(getFiltrados());
 }
 
 function avisoErroSupabase(acao, error){
@@ -1813,6 +1776,14 @@ function limparFiltros(){
   renderDashboard();
 }
 
+// Botões "+" e "−" do filtro de mínimo de lançamentos por colaboradora.
+function ajustarMinLanc(delta){
+  const input = document.getElementById('fi-min-lanc');
+  const atual = parseInt(input.value)||0;
+  input.value = Math.max(0, atual + delta);
+  aplicarFiltrosDashboard();
+}
+
 // Usada pelos filtros do dashboard: qualquer mudança de filtro volta pra
 // primeira página, pra não ficar numa página vazia por engano.
 function aplicarFiltrosDashboard(){
@@ -1821,14 +1792,16 @@ function aplicarFiltrosDashboard(){
 }
 
 // Segunda a domingo da semana anterior à atual.
-function intervaloSemanaAnterior(){
+// Segunda a domingo da semana anterior à atual. Com semanasAtras=1 volta
+// mais uma semana, e assim por diante.
+function intervaloSemanaAnterior(semanasAtras){
   const hj = new Date();
   hj.setHours(0,0,0,0);
   const diaSemana = (hj.getDay()+6)%7; // 0 = segunda
   const segundaDestaSemana = new Date(hj);
   segundaDestaSemana.setDate(hj.getDate()-diaSemana);
   const inicio = new Date(segundaDestaSemana);
-  inicio.setDate(segundaDestaSemana.getDate()-7);
+  inicio.setDate(segundaDestaSemana.getDate()-7*(1+(semanasAtras||0)));
   const fim = new Date(inicio);
   fim.setDate(inicio.getDate()+6);
   const iso = (d)=> d.toISOString().slice(0,10);
@@ -1871,10 +1844,17 @@ function getFiltrados(){
 
   // Atalho: lançamentos da semana anterior, mantendo só os 15 com plantio
   // mais antigo. Empates na data de plantio entram todos (pode passar de 15).
+  // Se a semana anterior não tiver lançamentos, recua semana a semana até
+  // encontrar uma que tenha (limite de ~2 anos para não varrer sem fim).
   const infoSemana = document.getElementById('fi-semana-info');
   if(semanaAntigos){
-    const {inicio, fim} = intervaloSemanaAnterior();
-    const daSemana = resultado.filter(r=> r.data>=inicio && r.data<=fim && r.plantio);
+    let daSemana = [];
+    let semana = null;
+    for(let volta = 0; volta < 104; volta++){
+      semana = intervaloSemanaAnterior(volta);
+      daSemana = resultado.filter(r=> r.data>=semana.inicio && r.data<=semana.fim && r.plantio);
+      if(daSemana.length) break;
+    }
     const ordenadosPorPlantio = [...daSemana].sort((a,b)=> a.plantio.localeCompare(b.plantio));
     if(ordenadosPorPlantio.length > 15){
       const corte = ordenadosPorPlantio[14].plantio;
@@ -1882,7 +1862,11 @@ function getFiltrados(){
     } else {
       resultado = daSemana;
     }
-    if(infoSemana) infoSemana.textContent = 'Semana de '+fmtData(inicio)+' a '+fmtData(fim)+' — '+resultado.length+' lançamento(s).';
+    if(infoSemana){
+      infoSemana.textContent = resultado.length
+        ? ('Semana de '+fmtData(semana.inicio)+' a '+fmtData(semana.fim)+' — '+resultado.length+' lançamento(s).')
+        : 'Nenhum lançamento encontrado nas últimas semanas.';
+    }
   } else if(infoSemana){
     infoSemana.textContent = '';
   }
@@ -1920,41 +1904,8 @@ function renderDashboard(){
   document.getElementById('db-taxa-enr').textContent = totPlant ? fmtPct((totEnr/totPlant)*100) : '–';
   document.getElementById('db-taxa-sob').textContent = totPlant ? fmtPct(((totPlant-totMort)/totPlant)*100) : '–';
 
-  // agrupar por data (soma ponderada por dia)
-  const porData = {};
-  filtrados.forEach(r=>{
-    if(!porData[r.data]) porData[r.data] = {plant:0, mort:0, enr:0};
-    porData[r.data].plant += r.plantadas;
-    porData[r.data].mort += r.mortas;
-    porData[r.data].enr += r.enraizadas;
-  });
-  const datas = Object.keys(porData).sort();
-  const serieEnr = datas.map(d=> porData[d].plant ? (porData[d].enr/porData[d].plant)*100 : null);
-  const serieSob = datas.map(d=> porData[d].plant ? ((porData[d].plant-porData[d].mort)/porData[d].plant)*100 : null);
+  renderGraficoPrincipal(filtrados);
 
-  document.getElementById('empty-chart').style.display = datas.length ? 'none' : 'block';
-  const canvas = document.getElementById('chart-evolucao');
-  canvas.style.display = datas.length ? 'block' : 'none';
-
-  if(chartEvolucao) chartEvolucao.destroy();
-  if(datas.length){
-    chartEvolucao = new Chart(canvas, {
-      type:'line',
-      data:{
-        labels: datas.map(fmtData),
-        datasets:[
-          {label:'Enraizamento (%)', data: serieEnr, borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3},
-          {label:'Sobrevivência (%)', data: serieSob, borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3},
-        ]
-      },
-      options: OPCOES_PCT
-    });
-  }
-
-  renderGraficoLote(filtrados);
-
-
-  renderGraficosExtras(filtrados);
 
   const tbody = document.getElementById('tbody-dash');
   const ordenado = [...filtrados].sort((a,b)=> b.data.localeCompare(a.data));
@@ -1979,89 +1930,26 @@ function renderDashboard(){
   renderRanking();
 }
 
-// ── GRÁFICO POR LOTE ──────────────────────────────────
-// Cada lote é posicionado pela sua data de plantio mais antiga, e é essa
-// data que também define o clima mostrado para aquele lote.
-function renderGraficoLote(filtrados){
-  const porLote = {};
-  filtrados.forEach(r=>{
-    if(!r.lote) return;
-    if(!porLote[r.lote]) porLote[r.lote] = {plant:0, mort:0, enr:0, plantioMin: r.plantio||null};
-    const g = porLote[r.lote];
-    g.plant += r.plantadas;
-    g.mort += r.mortas;
-    g.enr += r.enraizadas;
-    if(r.plantio && (!g.plantioMin || r.plantio < g.plantioMin)) g.plantioMin = r.plantio;
-  });
-  const lotes = Object.keys(porLote).sort((a,b)=>{
-    const da = porLote[a].plantioMin || '9999-99-99';
-    const db = porLote[b].plantioMin || '9999-99-99';
-    return da.localeCompare(db);
-  });
+// ── GRÁFICO PRINCIPAL (um só, com seletor de agrupamento) ─────────────
+// Todos os modos usam taxa PONDERADA: soma as mudas do grupo e divide
+// (enraizadas ÷ plantadas), em vez de tirar média das porcentagens.
+const MODOS_GRAFICO = {
+  data:         {rotulo:'Data de avaliação', descricao:'Taxa ponderada por dia de avaliação.', clima:true},
+  plantio:      {rotulo:'Data de plantio',   descricao:'Taxa ponderada por dia de plantio.', clima:true},
+  lote:         {rotulo:'Lote',              descricao:'Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente). O clima mostrado é o do dia de plantio de cada lote.', clima:true},
+  mes:          {rotulo:'Mês de avaliação',  descricao:'Taxa ponderada por mês de avaliação.', clima:false},
+  mes_plantio:  {rotulo:'Mês de plantio',    descricao:'Taxa ponderada, agrupada pelo mês em que as mudas foram plantadas.', clima:false},
+  clone:        {rotulo:'Clone (mensal)',        descricao:'Uma linha por clone ao longo dos meses de avaliação. Mostra até 10 clones com maior volume de mudas.', clima:false},
+  colaboradora: {rotulo:'Colaboradora (mensal)', descricao:'Uma linha por colaboradora ao longo dos meses de avaliação. Mostra até 10 com maior volume de mudas.', clima:false},
+};
 
-  const climaLigado = document.getElementById('ck-clima-lote').checked;
-  const datasetsLote = [
-    {label:'Enraizamento (%)', data: lotes.map(l=>taxaEnr(porLote[l])), borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3, yAxisID:'y'},
-    {label:'Sobrevivência (%)', data: lotes.map(l=>taxaSob(porLote[l])), borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3, yAxisID:'y'},
-  ];
-  const escalasLote = {
-    y:{ min:0, max:100, position:'left', ticks:{ callback:v=>v+'%' } },
-    x:{ title:{ display:true, text:'Lote (plantio mais antigo → mais recente)' } }
-  };
-
-  if(climaLigado && climaDados && lotes.length){
-    const climaDoLote = (l, campo)=>{
-      const dia = porLote[l].plantioMin;
-      return (dia && climaDados.datas[dia]) ? climaDados.datas[dia][campo] : null;
-    };
-    datasetsLote.push(
-      {type:'bar', label:'Chuva (mm)', data: lotes.map(l=>climaDoLote(l,'chuva')), backgroundColor:'rgba(24,95,165,.35)', borderColor:'rgba(24,95,165,.6)', borderWidth:1, yAxisID:'yChuva', order:9},
-      {label:'Temp. máx (°C)', data: lotes.map(l=>climaDoLote(l,'tmax')), borderColor:'#A32D2D', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:2, borderDash:[5,3], yAxisID:'yTemp'},
-      {label:'Temp. mín (°C)', data: lotes.map(l=>climaDoLote(l,'tmin')), borderColor:'#BA7517', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:2, borderDash:[5,3], yAxisID:'yTemp'}
-    );
-    escalasLote.yTemp = { position:'right', title:{display:true, text:'°C'}, grid:{drawOnChartArea:false} };
-    escalasLote.yChuva = { position:'right', title:{display:true, text:'mm'}, grid:{drawOnChartArea:false}, beginAtZero:true };
-  }
-
-  chartLote = desenharGrafico(chartLote, 'chart-lote', 'empty-chart-lote', {
-    type:'line',
-    data:{ labels: lotes, datasets: datasetsLote },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      scales: escalasLote,
-      plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{
-        title: (itens)=>{
-          const l = itens[0]?.label;
-          const dia = l && porLote[l] ? porLote[l].plantioMin : null;
-          return dia ? ('Lote '+l+' — plantio '+fmtData(dia)) : ('Lote '+l);
-        },
-        label: ctx=>{
-          const v = ctx.parsed.y;
-          if(v===null || v===undefined) return ctx.dataset.label+': –';
-          const sufixo = ctx.dataset.label.includes('%') ? '%' : (ctx.dataset.label.includes('°C') ? ' °C' : (ctx.dataset.label.includes('mm') ? ' mm' : ''));
-          return ctx.dataset.label.replace(/ \(.*\)/,'')+': '+v.toFixed(1)+sufixo;
-        }
-      } } }
-    }
-  }, lotes.length>0);
-
-  const statusLote = document.getElementById('clima-status-lote');
-  if(climaLigado){
-    if(!getCoordenadasClima()) statusLote.textContent = 'Selecione uma unidade no filtro para ver o clima (cada unidade tem sua própria localização).';
-    else if(climaDados && climaDados.erro) statusLote.textContent = climaDados.erro;
-    else if(!climaDados) statusLote.textContent = 'Carregando dados de clima...';
-    else statusLote.textContent = '';
-  } else {
-    statusLote.textContent = '';
-  }
-}
-
-// ── GRÁFICOS EXTRAS ──────────────────────────────────
+// Monta rótulos, séries e (quando faz sentido) a data usada para o clima
+// de cada ponto do eixo X.
 // Paleta usada nas séries múltiplas (por clone / por colaboradora).
 const PALETA_SERIES = ['#009146','#185FA5','#BA7517','#A32D2D','#6B3FA0','#0E8A8A','#C2185B','#5D7A1F','#8A6D1D','#4A5568'];
 
-// Agrupa por uma chave qualquer e devolve a taxa ponderada de enraizamento
-// (soma enraizadas ÷ soma plantadas) e de sobrevivência.
+// Agrupa por uma chave qualquer e soma as mudas do grupo (base da taxa
+// ponderada: soma primeiro, divide depois).
 function agruparPonderado(registros, obterChave){
   const grupos = {};
   registros.forEach(r=>{
@@ -2075,8 +1963,8 @@ function agruparPonderado(registros, obterChave){
   return grupos;
 }
 
-function taxaEnr(g){ return g.plant ? (g.enr/g.plant)*100 : null; }
-function taxaSob(g){ return g.plant ? ((g.plant-g.mort)/g.plant)*100 : null; }
+function taxaEnr(g){ return g && g.plant ? (g.enr/g.plant)*100 : null; }
+function taxaSob(g){ return g && g.plant ? ((g.plant-g.mort)/g.plant)*100 : null; }
 
 function mesDe(dataIso){ return dataIso ? dataIso.slice(0,7) : null; }
 function fmtMes(mes){
@@ -2085,14 +1973,6 @@ function fmtMes(mes){
   const nomes = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
   return nomes[parseInt(m,10)-1]+'/'+a.slice(2);
 }
-
-const OPCOES_PCT = {
-  responsive:true, maintainAspectRatio:false,
-  scales:{ y:{ min:0, max:100, ticks:{ callback:v=>v+'%' } } },
-  plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label: ctx=>
-    ctx.dataset.label+': '+(ctx.parsed.y===null||ctx.parsed.y===undefined ? '–' : ctx.parsed.y.toFixed(1)+'%')
-  } } }
-};
 
 function desenharGrafico(refAtual, canvasId, emptyId, config, temDados){
   document.getElementById(emptyId).style.display = temDados ? 'none' : 'block';
@@ -2131,97 +2011,125 @@ function seriesMensaisPorCategoria(registros, obterCategoria, limite){
   return {meses, datasets};
 }
 
-function renderGraficosExtras(filtrados){
-  // 1) Por data de plantio (com clima opcional da unidade selecionada)
-  const porPlantio = agruparPonderado(filtrados, r=>r.plantio);
-  const plantios = Object.keys(porPlantio).sort();
-
-  const climaLigado = document.getElementById('ck-clima').checked;
-  const datasetsPlantio = [
-    {label:'Enraizamento (%)', data: plantios.map(d=>taxaEnr(porPlantio[d])), borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3, yAxisID:'y'},
-    {label:'Sobrevivência (%)', data: plantios.map(d=>taxaSob(porPlantio[d])), borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3, yAxisID:'y'},
-  ];
-  const escalasPlantio = { y:{ min:0, max:100, position:'left', ticks:{ callback:v=>v+'%' } } };
-
-  if(climaLigado && climaDados && plantios.length){
-    datasetsPlantio.push(
-      {type:'bar', label:'Chuva (mm)', data: plantios.map(d=> climaDados.datas[d]?.chuva ?? null), backgroundColor:'rgba(24,95,165,.35)', borderColor:'rgba(24,95,165,.6)', borderWidth:1, yAxisID:'yChuva', order:9},
-      {label:'Temp. máx (°C)', data: plantios.map(d=> climaDados.datas[d]?.tmax ?? null), borderColor:'#A32D2D', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:2, borderDash:[5,3], yAxisID:'yTemp'},
-      {label:'Temp. mín (°C)', data: plantios.map(d=> climaDados.datas[d]?.tmin ?? null), borderColor:'#BA7517', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:2, borderDash:[5,3], yAxisID:'yTemp'}
-    );
-    escalasPlantio.yTemp = { position:'right', title:{display:true, text:'°C'}, grid:{drawOnChartArea:false} };
-    escalasPlantio.yChuva = { position:'right', title:{display:true, text:'mm'}, grid:{drawOnChartArea:false}, beginAtZero:true };
+function montarDadosGrafico(modo, filtrados){
+  if(modo==='clone' || modo==='colaboradora'){
+    const obterCategoria = modo==='clone'
+      ? (r=>r.clone)
+      : (r=> r.colaboradora ? (r.colaboradoraNome ? (r.colaboradora+' – '+r.colaboradoraNome) : String(r.colaboradora)) : null);
+    const {meses, datasets} = seriesMensaisPorCategoria(filtrados, obterCategoria, 10);
+    return {labels: meses.map(fmtMes), datasets, datasClima: null, tituloEixoX: null, temDados: meses.length>0 && datasets.length>0};
   }
 
-  chartPlantio = desenharGrafico(chartPlantio, 'chart-plantio', 'empty-chart-plantio', {
+  let grupos, chaves, labels, datasClima = null, tituloEixoX = null;
+
+  if(modo==='lote'){
+    grupos = {};
+    filtrados.forEach(r=>{
+      if(!r.lote) return;
+      if(!grupos[r.lote]) grupos[r.lote] = {plant:0, mort:0, enr:0, plantioMin: r.plantio||null};
+      const g = grupos[r.lote];
+      g.plant += (r.plantadas||0); g.mort += (r.mortas||0); g.enr += (r.enraizadas||0);
+      if(r.plantio && (!g.plantioMin || r.plantio < g.plantioMin)) g.plantioMin = r.plantio;
+    });
+    chaves = Object.keys(grupos).sort((a,b)=>
+      (grupos[a].plantioMin||'9999-99-99').localeCompare(grupos[b].plantioMin||'9999-99-99'));
+    labels = chaves;
+    datasClima = chaves.map(l=> grupos[l].plantioMin);
+    tituloEixoX = 'Lote (plantio mais antigo → mais recente)';
+  } else {
+    const obterChave =
+      modo==='data'        ? (r=>r.data) :
+      modo==='plantio'     ? (r=>r.plantio) :
+      modo==='mes'         ? (r=>mesDe(r.data)) :
+                             (r=>mesDe(r.plantio));
+    grupos = agruparPonderado(filtrados, obterChave);
+    chaves = Object.keys(grupos).sort();
+    const ehMes = (modo==='mes' || modo==='mes_plantio');
+    labels = chaves.map(k=> ehMes ? fmtMes(k) : fmtData(k));
+    if(modo==='data' || modo==='plantio') datasClima = chaves;
+  }
+
+  const datasets = [
+    {label:'Enraizamento (%)', data: chaves.map(k=>taxaEnr(grupos[k])), borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3, yAxisID:'y'},
+    {label:'Sobrevivência (%)', data: chaves.map(k=>taxaSob(grupos[k])), borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3, yAxisID:'y'},
+  ];
+  return {labels, datasets, datasClima, tituloEixoX, temDados: chaves.length>0, grupos, chaves};
+}
+
+function renderGraficoPrincipal(filtrados){
+  const modo = document.getElementById('gr-modo').value;
+  const info = MODOS_GRAFICO[modo];
+  document.getElementById('gr-descricao').textContent = info.descricao;
+
+  // O clima só faz sentido nos modos que têm uma data por ponto.
+  const wrapClima = document.getElementById('ck-clima-wrap');
+  wrapClima.style.display = info.clima ? 'flex' : 'none';
+
+  const dados = montarDadosGrafico(modo, filtrados);
+  const climaLigado = info.clima && document.getElementById('ck-clima').checked;
+  const datasets = [...dados.datasets];
+  const escalas = { y:{ min:0, max:100, position:'left', ticks:{ callback:v=>v+'%' } } };
+  if(dados.tituloEixoX) escalas.x = { title:{ display:true, text: dados.tituloEixoX } };
+
+  if(climaLigado && climaDados && dados.datasClima && dados.temDados){
+    const valor = (i, campo)=>{
+      const dia = dados.datasClima[i];
+      return (dia && climaDados.datas[dia]) ? climaDados.datas[dia][campo] : null;
+    };
+    const indices = dados.datasClima.map((_,i)=>i);
+    datasets.push(
+      {type:'bar', label:'Chuva (mm)', data: indices.map(i=>valor(i,'chuva')), backgroundColor:'rgba(24,95,165,.35)', borderColor:'rgba(24,95,165,.6)', borderWidth:1, yAxisID:'yChuva', order:9},
+      {label:'Temp. máx (°C)', data: indices.map(i=>valor(i,'tmax')), borderColor:'#A32D2D', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:2, borderDash:[5,3], yAxisID:'yTemp'},
+      {label:'Temp. mín (°C)', data: indices.map(i=>valor(i,'tmin')), borderColor:'#BA7517', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:2, borderDash:[5,3], yAxisID:'yTemp'}
+    );
+    escalas.yTemp = { position:'right', title:{display:true, text:'°C'}, grid:{drawOnChartArea:false} };
+    escalas.yChuva = { position:'right', title:{display:true, text:'mm'}, grid:{drawOnChartArea:false}, beginAtZero:true };
+  }
+
+  chartPrincipal = desenharGrafico(chartPrincipal, 'chart-principal', 'empty-chart', {
     type:'line',
-    data:{ labels: plantios.map(fmtData), datasets: datasetsPlantio },
+    data:{ labels: dados.labels, datasets },
     options:{
       responsive:true, maintainAspectRatio:false,
-      scales: escalasPlantio,
-      plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label: ctx=>{
-        const v = ctx.parsed.y;
-        if(v===null || v===undefined) return ctx.dataset.label+': –';
-        const sufixo = ctx.dataset.label.includes('%') ? '%' : (ctx.dataset.label.includes('°C') ? ' °C' : (ctx.dataset.label.includes('mm') ? ' mm' : ''));
-        return ctx.dataset.label.replace(/ \(.*\)/,'')+': '+v.toFixed(1)+sufixo;
-      } } } }
+      scales: escalas,
+      plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{
+        title: (itens)=>{
+          const base = itens[0]?.label ?? '';
+          if(modo!=='lote') return base;
+          const dia = dados.datasClima ? dados.datasClima[itens[0].dataIndex] : null;
+          return dia ? ('Lote '+base+' — plantio '+fmtData(dia)) : ('Lote '+base);
+        },
+        label: ctx=>{
+          const v = ctx.parsed.y;
+          if(v===null || v===undefined) return ctx.dataset.label+': –';
+          const sufixo = ctx.dataset.label.includes('%') ? '%'
+            : ctx.dataset.label.includes('°C') ? ' °C'
+            : ctx.dataset.label.includes('mm') ? ' mm' : '';
+          return ctx.dataset.label.replace(/ \(.*\)/,'')+': '+v.toFixed(1)+sufixo;
+        }
+      } } }
     }
-  }, plantios.length>0);
+  }, dados.temDados);
 
-  // Busca o clima e redesenha quando chegar. A chave inclui a unidade,
-  // pois cada unidade tem coordenadas próprias. Uma única busca alimenta
-  // tanto este gráfico quanto o de lotes.
+  // Busca o clima do intervalo em questão e redesenha quando chegar.
   const statusClima = document.getElementById('clima-status');
-  const unidadeClima = getUnidadeClima();
-  const rangeClima = plantios.length ? (unidadeClima+'|'+plantios[0]+'|'+plantios[plantios.length-1]) : null;
-  if(climaAtivo() && rangeClima && climaRangeCarregado !== rangeClima){
+  if(!climaLigado){ statusClima.textContent = ''; return; }
+
+  const diasValidos = (dados.datasClima||[]).filter(Boolean).sort();
+  if(!diasValidos.length){ statusClima.textContent = ''; return; }
+
+  const rangeClima = getUnidadeClima()+'|'+diasValidos[0]+'|'+diasValidos[diasValidos.length-1];
+  if(climaRangeCarregado !== rangeClima){
     climaRangeCarregado = rangeClima;
-    if(climaLigado) statusClima.textContent = 'Carregando dados de clima...';
-    buscarClima(plantios[0], plantios[plantios.length-1]).then(res=>{
+    statusClima.textContent = 'Carregando dados de clima...';
+    buscarClima(diasValidos[0], diasValidos[diasValidos.length-1]).then(res=>{
       climaDados = res;
-      statusClima.textContent = (climaLigado && res.erro) ? res.erro : '';
-      renderGraficosExtras(filtrados);
-      renderGraficoLote(filtrados);
+      statusClima.textContent = res.erro || '';
+      renderGraficoPrincipal(filtrados);
     });
-  } else if(climaLigado){
-    statusClima.textContent = (climaDados && climaDados.erro) ? climaDados.erro : '';
   } else {
-    statusClima.textContent = '';
+    statusClima.textContent = (climaDados && climaDados.erro) ? climaDados.erro : '';
   }
-
-  // 2) Mensal por clone
-  const porClone = seriesMensaisPorCategoria(filtrados, r=>r.clone, 10);
-  chartMesClone = desenharGrafico(chartMesClone, 'chart-mes-clone', 'empty-mes-clone', {
-    type:'line',
-    data:{ labels: porClone.meses.map(fmtMes), datasets: porClone.datasets },
-    options: OPCOES_PCT
-  }, porClone.meses.length>0 && porClone.datasets.length>0);
-
-  // 3) Mensal por colaboradora
-  const porColab = seriesMensaisPorCategoria(filtrados, r=>{
-    if(!r.colaboradora) return null;
-    return r.colaboradoraNome ? (r.colaboradora+' – '+r.colaboradoraNome) : String(r.colaboradora);
-  }, 10);
-  chartMesColab = desenharGrafico(chartMesColab, 'chart-mes-colab', 'empty-mes-colab', {
-    type:'line',
-    data:{ labels: porColab.meses.map(fmtMes), datasets: porColab.datasets },
-    options: OPCOES_PCT
-  }, porColab.meses.length>0 && porColab.datasets.length>0);
-
-  // 4) Mensal pelo mês de plantio
-  const porMesPlantio = agruparPonderado(filtrados, r=>mesDe(r.plantio));
-  const mesesPlantio = Object.keys(porMesPlantio).sort();
-  chartMesPlantio = desenharGrafico(chartMesPlantio, 'chart-mes-plantio', 'empty-mes-plantio', {
-    type:'line',
-    data:{
-      labels: mesesPlantio.map(fmtMes),
-      datasets:[
-        {label:'Enraizamento (%)', data: mesesPlantio.map(m=>taxaEnr(porMesPlantio[m])), borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3},
-        {label:'Sobrevivência (%)', data: mesesPlantio.map(m=>taxaSob(porMesPlantio[m])), borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3},
-      ]
-    },
-    options: OPCOES_PCT
-  }, mesesPlantio.length>0);
 }
 
 // ── SUB-ABAS DO DASHBOARD (Visão geral / Ranking) ──────────────────────
