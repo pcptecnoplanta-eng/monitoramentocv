@@ -282,6 +282,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 <nav>
   <button class="nt active" data-page="page-lancamento" onclick="trocarAba('page-lancamento',this)">Lançamento</button>
   <button class="nt" data-page="page-dashboard" onclick="trocarAba('page-dashboard',this)">Dashboard</button>
+  <button class="nt" data-page="page-planilha" onclick="trocarAba('page-planilha',this)">Planilha</button>
   <button class="nt" data-page="page-config" onclick="trocarAba('page-config',this)">Configurações</button>
 </nav>
 
@@ -533,6 +534,76 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       <div class="empty" id="empty-ranking" style="display:none;">Nenhum lançamento com colaboradora identificada para o filtro selecionado.</div>
       <div class="pagination" id="pag-ranking"></div>
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PLANILHA ═══════════════ -->
+<div class="page" id="page-planilha">
+
+  <div class="card">
+    <div class="ct">Planilha de Registro de Produção</div>
+    <div class="ms" style="margin-bottom:1rem;">
+      Envie o arquivo <strong>Registro de Produção (.xlsb / .xlsx)</strong>. O app lê a aba
+      <strong>"Rel Geral"</strong> e extrai, para cada lote, o enraizamento ponderado da coluna
+      <strong>N (ENR %)</strong>. Cada novo envio substitui completamente o anterior.
+    </div>
+    <div class="g2" style="align-items:end;">
+      <div class="field">
+        <label>Arquivo da planilha</label>
+        <input type="file" id="pl-arquivo" accept=".xlsb,.xlsx,.xlsm" onchange="onEscolherPlanilha()">
+      </div>
+      <div class="field">
+        <button type="button" class="btn bp" id="pl-btn-enviar" onclick="enviarPlanilha()" disabled>Processar e salvar</button>
+      </div>
+    </div>
+    <div class="ms" id="pl-status" style="margin-top:.75rem;"></div>
+  </div>
+
+  <div class="card" id="pl-info-card" style="display:none;">
+    <div class="ct">Planilha carregada</div>
+    <div class="metrics" style="margin-bottom:0;">
+      <div class="metric"><div class="ml">Arquivo</div><div class="mv" id="pl-nome" style="font-size:13px;word-break:break-all;">–</div></div>
+      <div class="metric"><div class="ml">Lotes na planilha</div><div class="mv" id="pl-total">0</div></div>
+      <div class="metric"><div class="ml">Enviada em</div><div class="mv" id="pl-data" style="font-size:13px;">–</div></div>
+      <div class="metric"><div class="ml">Lotes cruzados</div><div class="mv g" id="pl-cruzados">0</div></div>
+    </div>
+  </div>
+
+  <div class="card" id="pl-cruz-card" style="display:none;">
+    <div class="ltb">
+      <div class="ct" style="margin-bottom:0;">Cruzamento por lote — avaliação × planilha</div>
+      <div class="xb">
+        <span class="lc" id="pl-cruz-count">0 lotes</span>
+        <button class="btn be" style="padding:5px 12px;font-size:11px;" onclick="exportarCruzamento()">Exportar Excel</button>
+      </div>
+    </div>
+    <div class="ms" style="margin-bottom:.75rem;">
+      Compara o enraizamento medido nas avaliações do app (ponderado por lote) com o ENR% da planilha.
+      A diferença é <strong>avaliação − planilha</strong> em pontos percentuais.
+    </div>
+    <div class="g4" style="margin-bottom:12px;">
+      <div class="field"><label>Mostrar</label>
+        <select id="pl-filtro-tipo" onchange="renderCruzamento()">
+          <option value="ambos">Só lotes presentes nos dois</option>
+          <option value="todos">Todos os lotes avaliados no app</option>
+          <option value="divergentes">Só divergências acima de 10 p.p.</option>
+        </select>
+      </div>
+      <div class="field"><label>Buscar lote</label><input type="text" id="pl-busca" placeholder="Digite parte do lote" oninput="paginaCruz=1;renderCruzamento()"></div>
+      <div></div><div></div>
+    </div>
+    <div class="tw">
+      <table id="pl-tabela">
+        <thead><tr>
+          <th>Lote</th><th>Unidade</th><th>Clone</th><th>Avaliações</th>
+          <th>Plantadas</th><th>Enraizadas</th><th>Enraiz. avaliação</th>
+          <th>Produção (planilha)</th><th>Seleção (planilha)</th><th>ENR % planilha</th><th>Diferença</th>
+        </tr></thead>
+        <tbody id="pl-tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="pl-empty" style="display:none;">Nenhum lote para exibir com esse filtro.</div>
+    <div class="pagination" id="pag-cruz"></div>
   </div>
 </div>
 
@@ -1084,8 +1155,10 @@ function aplicarPermissoes(){
   const btnLanc = document.querySelector('.nt[data-page="page-lancamento"]');
   const btnDash = document.querySelector('.nt[data-page="page-dashboard"]');
   const btnCfg = document.querySelector('.nt[data-page="page-config"]');
+  const btnPlan = document.querySelector('.nt[data-page="page-planilha"]');
   btnLanc.style.display = (p==='admin' || p==='editor') ? '' : 'none';
   btnDash.style.display = '';
+  btnPlan.style.display = (p==='admin' || p==='editor') ? '' : 'none';
   btnCfg.style.display = (p==='admin') ? '' : 'none';
 
   document.getElementById('hd-user-name').textContent = usuarioAtual.nome || usuarioAtual.email;
@@ -1580,6 +1653,7 @@ function trocarAba(pageId, btn){
   if(usuarioAtual){
     const p = usuarioAtual.permissao;
     if(pageId==='page-lancamento' && !(p==='admin'||p==='editor')) return;
+    if(pageId==='page-planilha' && !(p==='admin'||p==='editor')) return;
     if(pageId==='page-config' && p!=='admin') return;
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -1589,6 +1663,10 @@ function trocarAba(pageId, btn){
   if(pageId==='page-dashboard'){
     popularFiltros(); renderDashboard();
     carregarLancamentos().then(()=>{ popularFiltros(); renderDashboard(); });
+  }
+  if(pageId==='page-planilha'){
+    renderPlanilha();
+    Promise.all([carregarPlanilha(), carregarLancamentos()]).then(()=>renderPlanilha());
   }
   if(pageId==='page-config'){
     renderConfigClones(); renderConfigColaboradoras(); renderAprovacoes(); renderSolicitacoesUpgrade(); renderUsuarios();
@@ -2130,6 +2208,272 @@ function renderGraficoPrincipal(filtrados){
   } else {
     statusClima.textContent = (climaDados && climaDados.erro) ? climaDados.erro : '';
   }
+}
+
+// ══════════════════ PLANILHA DE REGISTRO DE PRODUÇÃO ══════════════════
+// Lê a aba "Rel Geral", onde cada linha é um lote com Produção, Seleção e
+// ENR% (coluna N). O ENR% da planilha é justamente Seleção ÷ Produção.
+// Um mesmo lote pode aparecer em mais de uma linha (materiais diferentes),
+// então consolidamos somando Produção e Seleção — mantendo a taxa
+// ponderada, e não a média das porcentagens.
+let planilhaDados = null;   // {lotes:{LOTE:{producao,selecao,enr,material,mes,dataLote}}, ...}
+let arquivoPlanilha = null;
+let paginaCruz = 1;
+let cruzamentoAtual = [];
+
+function onEscolherPlanilha(){
+  const input = document.getElementById('pl-arquivo');
+  arquivoPlanilha = input.files && input.files[0] ? input.files[0] : null;
+  document.getElementById('pl-btn-enviar').disabled = !arquivoPlanilha;
+  document.getElementById('pl-status').textContent = arquivoPlanilha
+    ? ('Arquivo selecionado: '+arquivoPlanilha.name+' — clique em "Processar e salvar".')
+    : '';
+}
+
+// Localiza a linha de cabeçalho e as colunas de interesse pelo nome, em vez
+// de fixar posições — assim pequenas mudanças de layout não quebram tudo.
+function localizarColunasRelGeral(linhas){
+  for(let i=0; i<Math.min(linhas.length, 60); i++){
+    const linha = linhas[i] || [];
+    const textos = linha.map(c=> String(c==null?'':c).trim().toUpperCase());
+    const iLote = textos.findIndex(t=> t==='LOTE');
+    const iEnr  = textos.findIndex(t=> t.startsWith('ENR'));
+    if(iLote>=0 && iEnr>=0){
+      return {
+        linhaCabecalho: i,
+        iLote, iEnr,
+        iProducao: textos.findIndex(t=> t.startsWith('PRODU')),
+        iSelecao:  textos.findIndex(t=> t.startsWith('SELE')),
+        iMaterial: textos.findIndex(t=> t==='MATERIAL'),
+        iMes:      textos.findIndex(t=> t==='MÊS' || t==='MES'),
+        iDataLote: textos.findIndex(t=> t==='DATA LOTE'),
+      };
+    }
+  }
+  return null;
+}
+
+function processarPlanilha(arrayBuffer){
+  const wb = XLSX.read(new Uint8Array(arrayBuffer), {type:'array'});
+  const nomeAba = wb.SheetNames.find(n=> n.trim().toLowerCase()==='rel geral');
+  if(!nomeAba) throw new Error('A aba "Rel Geral" não foi encontrada nesta planilha.');
+
+  const linhas = XLSX.utils.sheet_to_json(wb.Sheets[nomeAba], {header:1, defval:null, raw:true});
+  const cols = localizarColunasRelGeral(linhas);
+  if(!cols) throw new Error('Não encontrei as colunas "Lote" e "ENR %" na aba "Rel Geral".');
+
+  const lotes = {};
+  let linhasLidas = 0;
+  for(let i = cols.linhaCabecalho+1; i<linhas.length; i++){
+    const linha = linhas[i] || [];
+    const loteBruto = linha[cols.iLote];
+    if(loteBruto===null || loteBruto===undefined || String(loteBruto).trim()==='') continue;
+    const lote = String(loteBruto).trim();
+    if(lote.toUpperCase().startsWith('TOTAL')) continue;
+
+    const num = (idx)=>{
+      if(idx<0) return 0;
+      const v = linha[idx];
+      return typeof v==='number' && isFinite(v) ? v : 0;
+    };
+    const producao = num(cols.iProducao);
+    const selecao  = num(cols.iSelecao);
+    const enrLinha = cols.iEnr>=0 && typeof linha[cols.iEnr]==='number' ? linha[cols.iEnr] : null;
+
+    if(!lotes[lote]) lotes[lote] = {producao:0, selecao:0, enrDireto:null, material:null, mes:null};
+    const g = lotes[lote];
+    g.producao += producao;
+    g.selecao  += selecao;
+    if(g.enrDireto===null && enrLinha!==null) g.enrDireto = enrLinha;
+    if(!g.material && cols.iMaterial>=0 && linha[cols.iMaterial]!=null) g.material = String(linha[cols.iMaterial]).trim();
+    if(!g.mes && cols.iMes>=0 && linha[cols.iMes]!=null) g.mes = String(linha[cols.iMes]).trim();
+    linhasLidas++;
+  }
+
+  // Taxa final por lote: preferimos recalcular Seleção ÷ Produção (assim
+  // lotes repetidos ficam corretamente ponderados). Se não houver produção
+  // registrada, caímos no ENR% que veio pronto na planilha.
+  Object.keys(lotes).forEach(l=>{
+    const g = lotes[l];
+    g.enr = g.producao > 0 ? (g.selecao/g.producao) : (g.enrDireto ?? null);
+    delete g.enrDireto;
+  });
+
+  return {lotes, linhasLidas, totalLotes: Object.keys(lotes).length};
+}
+
+async function enviarPlanilha(){
+  if(!arquivoPlanilha) return;
+  const status = document.getElementById('pl-status');
+  const botao = document.getElementById('pl-btn-enviar');
+  botao.disabled = true;
+  status.textContent = 'Lendo a planilha... (arquivos grandes podem levar alguns segundos)';
+
+  try{
+    const buffer = await arquivoPlanilha.arrayBuffer();
+    const resultado = processarPlanilha(buffer);
+    if(!resultado.totalLotes) throw new Error('Nenhum lote encontrado na aba "Rel Geral".');
+
+    status.textContent = 'Salvando '+resultado.totalLotes+' lotes...';
+    const {error} = await sb.from('planilha_rel_geral').upsert({
+      id: 1,
+      dados: resultado.lotes,
+      arquivo_nome: arquivoPlanilha.name,
+      total_lotes: resultado.totalLotes,
+      enviado_em: new Date().toISOString(),
+      enviado_por: usuarioAtual ? usuarioAtual.email : null
+    }, {onConflict:'id'});
+    if(error){ avisoErroSupabase('salvar a planilha', error); status.textContent = 'Falha ao salvar.'; return; }
+
+    registrarEvento('planilha_enviada', arquivoPlanilha.name+' ('+resultado.totalLotes+' lotes)', usuarioAtual?.email);
+    status.textContent = 'Planilha processada: '+resultado.totalLotes+' lotes salvos (substituiu a anterior).';
+    document.getElementById('pl-arquivo').value = '';
+    arquivoPlanilha = null;
+    await carregarPlanilha();
+    renderPlanilha();
+  }catch(e){
+    console.error(e);
+    status.textContent = 'Erro: '+e.message;
+  }finally{
+    botao.disabled = !arquivoPlanilha;
+  }
+}
+
+async function carregarPlanilha(){
+  const {data, error} = await sb.from('planilha_rel_geral').select('*').eq('id',1).maybeSingle();
+  if(error){ console.warn('Falha ao carregar planilha:', error); return; }
+  planilhaDados = data || null;
+}
+
+// ── CRUZAMENTO: avaliações do app × ENR% da planilha, por lote ──────────
+function calcularCruzamento(){
+  const daPlanilha = (planilhaDados && planilhaDados.dados) ? planilhaDados.dados : {};
+
+  // Agrupa os lançamentos do app por lote (ponderado).
+  const porLoteApp = {};
+  db.forEach(r=>{
+    if(!r.lote) return;
+    const lote = String(r.lote).trim();
+    if(!porLoteApp[lote]) porLoteApp[lote] = {plant:0, mort:0, enr:0, n:0, unidades:new Set(), clones:new Set()};
+    const g = porLoteApp[lote];
+    g.plant += (r.plantadas||0);
+    g.mort  += (r.mortas||0);
+    g.enr   += (r.enraizadas||0);
+    g.n++;
+    if(r.unidade) g.unidades.add(r.unidade);
+    if(r.clone) g.clones.add(r.clone);
+  });
+
+  return Object.keys(porLoteApp).sort().map(lote=>{
+    const g = porLoteApp[lote];
+    const p = daPlanilha[lote] || null;
+    const enrApp = g.plant ? (g.enr/g.plant)*100 : null;
+    const enrPlan = (p && p.enr!==null && p.enr!==undefined) ? p.enr*100 : null;
+    return {
+      lote,
+      unidade: [...g.unidades].join(', '),
+      clone: [...g.clones].join(', '),
+      avaliacoes: g.n,
+      plantadas: g.plant,
+      enraizadas: g.enr,
+      enrApp,
+      producao: p ? p.producao : null,
+      selecao: p ? p.selecao : null,
+      enrPlan,
+      diferenca: (enrApp!==null && enrPlan!==null) ? (enrApp - enrPlan) : null,
+      naPlanilha: !!p
+    };
+  });
+}
+
+function renderPlanilha(){
+  const info = document.getElementById('pl-info-card');
+  if(planilhaDados){
+    info.style.display = 'block';
+    document.getElementById('pl-nome').textContent = planilhaDados.arquivo_nome || '–';
+    document.getElementById('pl-total').textContent = planilhaDados.total_lotes || 0;
+    const dt = planilhaDados.enviado_em ? new Date(planilhaDados.enviado_em) : null;
+    document.getElementById('pl-data').textContent = dt
+      ? (dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))
+      : '–';
+  } else {
+    info.style.display = 'none';
+  }
+  paginaCruz = 1;
+  renderCruzamento();
+}
+
+function renderCruzamento(){
+  const card = document.getElementById('pl-cruz-card');
+  const todos = calcularCruzamento();
+  document.getElementById('pl-cruzados').textContent = todos.filter(l=>l.naPlanilha).length;
+
+  if(!todos.length){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const tipo = document.getElementById('pl-filtro-tipo').value;
+  const busca = document.getElementById('pl-busca').value.trim().toLowerCase();
+  let lista = todos;
+  if(tipo==='ambos') lista = lista.filter(l=>l.naPlanilha);
+  else if(tipo==='divergentes') lista = lista.filter(l=> l.diferenca!==null && Math.abs(l.diferenca) > 10);
+  if(busca) lista = lista.filter(l=> l.lote.toLowerCase().includes(busca));
+
+  cruzamentoAtual = lista;
+  document.getElementById('pl-cruz-count').textContent = lista.length+' lote'+(lista.length!==1?'s':'');
+  document.getElementById('pl-empty').style.display = lista.length ? 'none' : 'block';
+  document.getElementById('pl-tabela').style.display = lista.length ? 'table' : 'none';
+
+  const totalPaginas = Math.max(1, Math.ceil(lista.length/ITENS_POR_PAGINA));
+  if(paginaCruz>totalPaginas) paginaCruz = totalPaginas;
+  if(paginaCruz<1) paginaCruz = 1;
+  const inicio = (paginaCruz-1)*ITENS_POR_PAGINA;
+
+  document.getElementById('pl-tbody').innerHTML = lista.slice(inicio, inicio+ITENS_POR_PAGINA).map(l=>{
+    const corDif = l.diferenca===null ? '' :
+      (Math.abs(l.diferenca) > 10 ? 'color:var(--rd);font-weight:600;' : 'color:var(--gd);');
+    const dif = l.diferenca===null ? '–' : ((l.diferenca>0?'+':'')+l.diferenca.toFixed(1)+' p.p.');
+    return `<tr>
+      <td>${escapeHtml(l.lote)}</td>
+      <td>${escapeHtml(l.unidade)}</td>
+      <td>${escapeHtml(l.clone)}</td>
+      <td>${l.avaliacoes}</td>
+      <td>${l.plantadas}</td>
+      <td>${l.enraizadas}</td>
+      <td>${fmtPct(l.enrApp)}</td>
+      <td>${l.producao!==null ? l.producao : '–'}</td>
+      <td>${l.selecao!==null ? l.selecao : '–'}</td>
+      <td>${l.enrPlan!==null ? fmtPct(l.enrPlan) : '<span style="color:var(--txm);">não encontrado</span>'}</td>
+      <td style="${corDif}">${dif}</td>
+    </tr>`;
+  }).join('');
+
+  renderPaginacao('pag-cruz', lista.length, paginaCruz, 'irParaPaginaCruz');
+}
+
+function irParaPaginaCruz(n){
+  paginaCruz = n;
+  renderCruzamento();
+}
+
+function exportarCruzamento(){
+  if(!cruzamentoAtual.length){ alert('Não há dados para exportar.'); return; }
+  const linhas = cruzamentoAtual.map(l=>({
+    'Lote': l.lote,
+    'Unidade': l.unidade,
+    'Clone': l.clone,
+    'Avaliações no app': l.avaliacoes,
+    'Mudas plantadas': l.plantadas,
+    'Mudas enraizadas': l.enraizadas,
+    'Enraizamento avaliação (%)': l.enrApp!==null ? +l.enrApp.toFixed(1) : '',
+    'Produção (planilha)': l.producao ?? '',
+    'Seleção (planilha)': l.selecao ?? '',
+    'ENR % planilha': l.enrPlan!==null ? +l.enrPlan.toFixed(1) : '',
+    'Diferença (p.p.)': l.diferenca!==null ? +l.diferenca.toFixed(1) : ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cruzamento');
+  XLSX.writeFile(wb, 'cruzamento_lotes_'+hoje()+'.xlsx');
 }
 
 // ── SUB-ABAS DO DASHBOARD (Visão geral / Ranking) ──────────────────────
