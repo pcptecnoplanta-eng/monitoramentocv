@@ -489,6 +489,19 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       <div class="empty" id="empty-chart" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
     </div>
 
+    <div class="card" id="pl-grafico-card">
+      <div class="ltb">
+        <div class="ct" style="margin-bottom:0;">Enraizamento: avaliação × planilha de registro, por lote</div>
+        <span class="lc" id="pl-grafico-count"></span>
+      </div>
+      <div class="ms" style="margin-bottom:.5rem;">
+        Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente).
+        A planilha usada é a da unidade de cada lançamento (enviada na aba Planilha).
+      </div>
+      <div class="chart-wrap"><canvas id="chart-cruzamento"></canvas></div>
+      <div class="empty" id="pl-grafico-empty" style="display:none;">Nenhum lote com os dois valores para comparar. Envie a planilha de registro da unidade na aba "Planilha".</div>
+    </div>
+
     <div class="card">
       <div class="ltb">
         <div class="ct" style="margin-bottom:0;">Registros filtrados</div>
@@ -543,11 +556,19 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   <div class="card">
     <div class="ct">Planilha de Registro de Produção</div>
     <div class="ms" style="margin-bottom:1rem;">
-      Envie o arquivo <strong>Registro de Produção</strong> (<strong>.xlsb</strong> ou <strong>.xlsx</strong>).
-      O app lê a aba <strong>"Rel Geral"</strong> e extrai, para cada lote, o enraizamento ponderado
-      da coluna <strong>N (ENR %)</strong>. Cada novo envio substitui completamente o anterior.
+      Envie o arquivo <strong>Registro de Produção</strong> (<strong>.xlsb</strong> ou <strong>.xlsx</strong>)
+      indicando <strong>de qual unidade</strong> ele é. O app lê a aba <strong>"Rel Geral"</strong> e extrai,
+      para cada lote, o enraizamento ponderado da coluna <strong>N (ENR %)</strong>.
+      Cada unidade tem a sua planilha: um novo envio substitui apenas a planilha daquela unidade.
     </div>
-    <div class="g2" style="align-items:end;">
+    <div class="g3" style="align-items:end;">
+      <div class="field">
+        <label>Unidade da planilha</label>
+        <select id="pl-unidade">
+          <option value="">Selecione...</option>
+          <option>UBR</option><option>UBN</option><option>UTB</option><option>UES</option><option>UBA</option>
+        </select>
+      </div>
       <div class="field">
         <label>Arquivo da planilha</label>
         <input type="file" id="pl-arquivo" accept=".xlsb,.xlsx,.xlsm" onchange="onEscolherPlanilha()">
@@ -559,24 +580,15 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     <div class="ms" id="pl-status" style="margin-top:.75rem;"></div>
   </div>
 
-  <div class="card" id="pl-info-card" style="display:none;">
-    <div class="ct">Planilha carregada</div>
-    <div class="metrics" style="margin-bottom:0;">
-      <div class="metric"><div class="ml">Arquivo</div><div class="mv" id="pl-nome" style="font-size:13px;word-break:break-all;">–</div></div>
-      <div class="metric"><div class="ml">Lotes na planilha</div><div class="mv" id="pl-total">0</div></div>
-      <div class="metric"><div class="ml">Enviada em</div><div class="mv" id="pl-data" style="font-size:13px;">–</div></div>
-      <div class="metric"><div class="ml">Lotes cruzados</div><div class="mv g" id="pl-cruzados">0</div></div>
+  <div class="card">
+    <div class="ct">Planilhas carregadas por unidade</div>
+    <div class="tw">
+      <table id="pl-lista-tabela" style="min-width:0;">
+        <thead><tr><th>Unidade</th><th>Arquivo</th><th>Lotes</th><th>Enviada em</th><th>Por</th><th></th></tr></thead>
+        <tbody id="pl-lista-tbody"></tbody>
+      </table>
     </div>
-  </div>
-
-  <div class="card" id="pl-grafico-card" style="display:none;">
-    <div class="ct">Enraizamento: avaliação × planilha, por lote</div>
-    <div class="ms" style="margin-bottom:.5rem;">
-      Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente).
-      Considera os filtros do Dashboard e os filtros desta aba.
-    </div>
-    <div class="chart-wrap"><canvas id="chart-cruzamento"></canvas></div>
-    <div class="empty" id="pl-grafico-empty" style="display:none;">Nenhum lote com os dois valores para comparar.</div>
+    <div class="empty" id="pl-lista-empty" style="display:none;">Nenhuma planilha enviada ainda.</div>
   </div>
 
   <div class="card" id="pl-cruz-card" style="display:none;">
@@ -1129,6 +1141,7 @@ async function iniciarSessao(user){
   await Promise.all([
     carregarLancamentos(),
     carregarConfig(),
+    carregarPlanilha(),
     user.permissao==='admin' ? carregarUsuarios() : Promise.resolve()
   ]);
 
@@ -1672,7 +1685,7 @@ function trocarAba(pageId, btn){
   btn.classList.add('active');
   if(pageId==='page-dashboard'){
     popularFiltros(); renderDashboard();
-    carregarLancamentos().then(()=>{ popularFiltros(); renderDashboard(); });
+    Promise.all([carregarLancamentos(), carregarPlanilha()]).then(()=>{ popularFiltros(); renderDashboard(); });
   }
   if(pageId==='page-planilha'){
     renderPlanilha();
@@ -1993,6 +2006,7 @@ function renderDashboard(){
   document.getElementById('db-taxa-sob').textContent = totPlant ? fmtPct(((totPlant-totMort)/totPlant)*100) : '–';
 
   renderGraficoPrincipal(filtrados);
+  renderGraficoCruzamento();
 
 
   const tbody = document.getElementById('tbody-dash');
@@ -2226,7 +2240,7 @@ function renderGraficoPrincipal(filtrados){
 // Um mesmo lote pode aparecer em mais de uma linha (materiais diferentes),
 // então consolidamos somando Produção e Seleção — mantendo a taxa
 // ponderada, e não a média das porcentagens.
-let planilhaDados = null;   // {lotes:{LOTE:{producao,selecao,enr,material,mes,dataLote}}, ...}
+let planilhaDados = {};     // { UNIDADE: {dados:{LOTE:{...}}, arquivo_nome, ...} }
 let arquivoPlanilha = null;
 let paginaCruz = 1;
 let cruzamentoAtual = [];
@@ -2433,7 +2447,7 @@ function onEscolherPlanilha(){
   arquivoPlanilha = input.files && input.files[0] ? input.files[0] : null;
   document.getElementById('pl-btn-enviar').disabled = !arquivoPlanilha;
   document.getElementById('pl-status').textContent = arquivoPlanilha
-    ? ('Arquivo selecionado: '+arquivoPlanilha.name+' — clique em "Processar e salvar".')
+    ? ('Arquivo selecionado: '+arquivoPlanilha.name+' — escolha a unidade e clique em "Processar e salvar".')
     : '';
 }
 
@@ -2526,6 +2540,13 @@ async function enviarPlanilha(){
   if(!arquivoPlanilha) return;
   const status = document.getElementById('pl-status');
   const botao = document.getElementById('pl-btn-enviar');
+  const unidade = document.getElementById('pl-unidade').value;
+
+  if(!unidade){
+    status.textContent = 'Escolha de qual unidade é esta planilha antes de enviar.';
+    return;
+  }
+
   botao.disabled = true;
   status.textContent = 'Lendo a planilha... (arquivos grandes podem levar alguns segundos)';
 
@@ -2535,19 +2556,19 @@ async function enviarPlanilha(){
     const resultado = await processarPlanilha(buffer, nomeArquivo);
     if(!resultado.totalLotes) throw new Error('Nenhum lote encontrado na aba "Rel Geral".');
 
-    status.textContent = 'Salvando '+resultado.totalLotes+' lotes...';
+    status.textContent = 'Salvando '+resultado.totalLotes+' lotes da unidade '+unidade+'...';
     const {error} = await sb.from('planilha_rel_geral').upsert({
-      id: 1,
+      unidade,
       dados: resultado.lotes,
       arquivo_nome: nomeArquivo,
       total_lotes: resultado.totalLotes,
       enviado_em: new Date().toISOString(),
       enviado_por: usuarioAtual ? usuarioAtual.email : null
-    }, {onConflict:'id'});
+    }, {onConflict:'unidade'});
     if(error){ avisoErroSupabase('salvar a planilha', error); status.textContent = 'Falha ao salvar.'; return; }
 
-    registrarEvento('planilha_enviada', nomeArquivo+' ('+resultado.totalLotes+' lotes)', usuarioAtual?.email);
-    status.textContent = 'Planilha processada: '+resultado.totalLotes+' lotes salvos (substituiu a anterior).';
+    registrarEvento('planilha_enviada', unidade+' — '+nomeArquivo+' ('+resultado.totalLotes+' lotes)', usuarioAtual?.email);
+    status.textContent = 'Planilha da unidade '+unidade+' processada: '+resultado.totalLotes+' lotes salvos (substituiu a anterior desta unidade).';
     document.getElementById('pl-arquivo').value = '';
     arquivoPlanilha = null;
     await carregarPlanilha();
@@ -2561,46 +2582,56 @@ async function enviarPlanilha(){
 }
 
 async function carregarPlanilha(){
-  const {data, error} = await sb.from('planilha_rel_geral').select('*').eq('id',1).maybeSingle();
-  if(error){ console.warn('Falha ao carregar planilha:', error); return; }
-  planilhaDados = data || null;
+  const {data, error} = await sb.from('planilha_rel_geral').select('*');
+  if(error){ console.warn('Falha ao carregar planilhas:', error); return; }
+  planilhaDados = {};
+  (data||[]).forEach(linha=>{ planilhaDados[linha.unidade] = linha; });
+}
+
+async function removerPlanilha(unidade){
+  if(!confirm('Remover a planilha da unidade '+unidade+'?')) return;
+  const {error} = await sb.from('planilha_rel_geral').delete().eq('unidade', unidade);
+  if(error){ avisoErroSupabase('remover a planilha', error); return; }
+  registrarEvento('planilha_removida', unidade, usuarioAtual?.email);
+  await carregarPlanilha();
+  renderPlanilha();
 }
 
 // ── CRUZAMENTO: avaliações do app × ENR% da planilha, por lote ──────────
 // Usa os lançamentos já filtrados no Dashboard, então todos os filtros
 // (unidade, clone, espécie, período, idade etc.) valem aqui também.
 function calcularCruzamento(){
-  const daPlanilha = (planilhaDados && planilhaDados.dados) ? planilhaDados.dados : {};
-
-  const porLoteApp = {};
+  // Agrupa por unidade + lote: o mesmo número de lote pode existir em
+  // unidades diferentes, e cada unidade tem a sua planilha.
+  const grupos = {};
   getFiltrados().forEach(r=>{
-    if(!r.lote) return;
+    if(!r.lote || !r.unidade) return;
     const lote = String(r.lote).trim();
-    if(!porLoteApp[lote]) porLoteApp[lote] = {plant:0, mort:0, enr:0, n:0, unidades:new Set(), clones:new Set(), plantioMin:null};
-    const g = porLoteApp[lote];
+    const chave = r.unidade+'||'+lote;
+    if(!grupos[chave]) grupos[chave] = {unidade:r.unidade, lote, plant:0, mort:0, enr:0, n:0, clones:new Set(), plantioMin:null};
+    const g = grupos[chave];
     g.plant += (r.plantadas||0);
     g.mort  += (r.mortas||0);
     g.enr   += (r.enraizadas||0);
     g.n++;
-    if(r.unidade) g.unidades.add(r.unidade);
     if(r.clone) g.clones.add(r.clone);
     if(r.plantio && (!g.plantioMin || r.plantio < g.plantioMin)) g.plantioMin = r.plantio;
   });
 
   // Ordena pelo plantio mais antigo — é a ordem usada também no gráfico.
-  return Object.keys(porLoteApp).sort((a,b)=>{
-    const da = porLoteApp[a].plantioMin || '9999-99-99';
-    const db2 = porLoteApp[b].plantioMin || '9999-99-99';
-    return da.localeCompare(db2) || a.localeCompare(b);
-  }).map(lote=>{
-    const g = porLoteApp[lote];
-    const p = daPlanilha[lote] || null;
+  return Object.values(grupos).sort((a,b)=>{
+    const da = a.plantioMin || '9999-99-99';
+    const db2 = b.plantioMin || '9999-99-99';
+    return da.localeCompare(db2) || a.lote.localeCompare(b.lote);
+  }).map(g=>{
+    const planUnidade = planilhaDados[g.unidade];
+    const p = (planUnidade && planUnidade.dados) ? (planUnidade.dados[g.lote] || null) : null;
     const enrApp = g.plant ? (g.enr/g.plant)*100 : null;
     const enrPlan = (p && p.enr!==null && p.enr!==undefined) ? p.enr*100 : null;
     return {
-      lote,
+      lote: g.lote,
       plantio: g.plantioMin,
-      unidade: [...g.unidades].join(', '),
+      unidade: g.unidade,
       clone: [...g.clones].join(', '),
       avaliacoes: g.n,
       plantadas: g.plant,
@@ -2616,18 +2647,23 @@ function calcularCruzamento(){
 }
 
 function renderPlanilha(){
-  const info = document.getElementById('pl-info-card');
-  if(planilhaDados){
-    info.style.display = 'block';
-    document.getElementById('pl-nome').textContent = planilhaDados.arquivo_nome || '–';
-    document.getElementById('pl-total').textContent = planilhaDados.total_lotes || 0;
-    const dt = planilhaDados.enviado_em ? new Date(planilhaDados.enviado_em) : null;
-    document.getElementById('pl-data').textContent = dt
-      ? (dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))
-      : '–';
-  } else {
-    info.style.display = 'none';
-  }
+  const tbody = document.getElementById('pl-lista-tbody');
+  const unidades = Object.keys(planilhaDados).sort();
+  tbody.innerHTML = unidades.map(u=>{
+    const p = planilhaDados[u];
+    const dt = p.enviado_em ? new Date(p.enviado_em) : null;
+    const quando = dt ? (dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})) : '–';
+    return `<tr>
+      <td><strong>${escapeHtml(u)}</strong></td>
+      <td style="white-space:normal;max-width:260px;">${escapeHtml(p.arquivo_nome||'–')}</td>
+      <td>${p.total_lotes||0}</td>
+      <td>${quando}</td>
+      <td>${escapeHtml(p.enviado_por||'–')}</td>
+      <td><button class="btn bd2" onclick="removerPlanilha(${jsAttr(u)})">Remover</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('pl-lista-empty').style.display = unidades.length ? 'none' : 'block';
+  document.getElementById('pl-lista-tabela').style.display = unidades.length ? 'table' : 'none';
   paginaCruz = 1;
   renderCruzamento();
 }
@@ -2635,7 +2671,6 @@ function renderPlanilha(){
 function renderCruzamento(){
   const card = document.getElementById('pl-cruz-card');
   const todos = calcularCruzamento();
-  document.getElementById('pl-cruzados').textContent = todos.filter(l=>l.naPlanilha).length;
 
   if(!todos.length){
     card.style.display = 'none';
@@ -2682,16 +2717,18 @@ function renderCruzamento(){
   }).join('');
 
   renderPaginacao('pag-cruz', lista.length, paginaCruz, 'irParaPaginaCruz');
-  renderGraficoCruzamento(lista);
 }
 
 // Compara, lote a lote, o enraizamento medido nas avaliações com o da
-// planilha. A ordem no eixo X é a mesma da tabela: plantio mais antigo à
-// esquerda, mais recente à direita.
-function renderGraficoCruzamento(lista){
-  const card = document.getElementById('pl-grafico-card');
+// planilha de registro da unidade. Fica no Dashboard e usa os mesmos
+// filtros de lá. Ordem do eixo X: plantio mais antigo à esquerda.
+function renderGraficoCruzamento(){
+  const lista = calcularCruzamento();
   const comAmbos = lista.filter(l=> l.enrApp!==null && l.enrPlan!==null);
-  card.style.display = 'block';
+  const contador = document.getElementById('pl-grafico-count');
+  if(contador) contador.textContent = comAmbos.length
+    ? (comAmbos.length+' lote'+(comAmbos.length!==1?'s':'')+' comparado'+(comAmbos.length!==1?'s':''))
+    : '';
 
   chartCruzamento = desenharGrafico(chartCruzamento, 'chart-cruzamento', 'pl-grafico-empty', {
     type:'line',
