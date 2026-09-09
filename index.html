@@ -637,9 +637,17 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
           <option value="">Carregando...</option>
         </select>
       </div>
+      <div class="field"><label>Ou digite o nome da tabela</label>
+        <div class="inline-add">
+          <input type="text" id="df-tabela-manual" placeholder="ex.: aplicacoes" onkeydown="if(event.key==='Enter'){event.preventDefault();onTrocarTabelaDefensivos();}">
+          <button type="button" class="btn bp" onclick="onTrocarTabelaDefensivos()">Carregar</button>
+        </div>
+      </div>
       <div class="field"><label>Buscar</label><input type="text" id="df-busca" placeholder="Defensivo, clone, lote..." oninput="paginaDef=1;renderDefensivos()"></div>
-      <div class="field"><label>Data — início</label><input type="date" id="df-data-ini" onchange="paginaDef=1;renderDefensivos()"></div>
-      <div class="field"><label>Data — fim</label><input type="date" id="df-data-fim" onchange="paginaDef=1;renderDefensivos()"></div>
+      <div class="g2" style="gap:8px;">
+        <div class="field"><label>Data — início</label><input type="date" id="df-data-ini" onchange="paginaDef=1;renderDefensivos()"></div>
+        <div class="field"><label>Data — fim</label><input type="date" id="df-data-fim" onchange="paginaDef=1;renderDefensivos()"></div>
+      </div>
     </div>
     <div class="filtro-rodape" style="margin-bottom:10px;">
       <div class="field" style="max-width:260px;"><label>Coluna de data usada no filtro</label>
@@ -2226,9 +2234,11 @@ let defensivosColunas = [];
 let defensivosTabelas = [];
 let paginaDef = 1;
 
-// Pergunta ao PostgREST quais tabelas existem no projeto.
+// Pergunta ao PostgREST quais tabelas existem no projeto. Chaves no
+// formato novo (sb_publishable_...) não são JWT, então vão só no header
+// "apikey" — mandá-las como Bearer faz o servidor responder 401.
 async function listarTabelasAplic(){
-  const resp = await fetch(APLIC_URL+'/rest/v1/', {headers:{apikey: APLIC_KEY, Authorization:'Bearer '+APLIC_KEY}});
+  const resp = await fetch(APLIC_URL+'/rest/v1/', {headers:{apikey: APLIC_KEY}});
   if(!resp.ok) throw new Error('HTTP '+resp.status);
   const spec = await resp.json();
   const caminhos = Object.keys(spec.paths || {});
@@ -2257,20 +2267,38 @@ function palpiteTabelaDefensivos(tabelas){
 async function carregarDefensivos(forcar){
   const status = document.getElementById('df-status');
   const selTabela = document.getElementById('df-tabela');
+  const manual = document.getElementById('df-tabela-manual');
+
+  // 1) Tenta descobrir as tabelas. Se o projeto não expõe essa listagem
+  //    (comum quando a introspecção está desativada), seguimos em frente:
+  //    basta o nome da tabela digitado no campo ao lado.
+  if(!defensivosTabelas.length || forcar){
+    status.textContent = 'Conectando ao Controle de Aplicação...';
+    try{
+      defensivosTabelas = await listarTabelasAplic();
+      if(defensivosTabelas.length){
+        const escolhida = selTabela.value || palpiteTabelaDefensivos(defensivosTabelas);
+        selTabela.innerHTML = defensivosTabelas.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+        selTabela.value = escolhida;
+        selTabela.disabled = false;
+      }
+    }catch(e){
+      console.warn('Listagem de tabelas indisponível:', e);
+      selTabela.innerHTML = '<option value="">(listagem indisponível)</option>';
+      selTabela.disabled = true;
+    }
+  }
+
+  // 2) Define a tabela a consultar: o que estiver digitado tem prioridade.
+  const tabela = (manual.value.trim() || selTabela.value || localStorage.getItem(APLIC_TABELA_KEY) || '').trim();
+  if(!tabela){
+    status.textContent = 'Não consegui listar as tabelas deste projeto. Digite o nome da tabela de aplicações no campo "Nome da tabela" e clique em Carregar.';
+    defensivosLinhas = []; defensivosColunas = [];
+    renderDefensivos();
+    return;
+  }
 
   try{
-    if(!defensivosTabelas.length || forcar){
-      status.textContent = 'Conectando ao Controle de Aplicação...';
-      defensivosTabelas = await listarTabelasAplic();
-      if(!defensivosTabelas.length) throw new Error('Nenhuma tabela visível neste projeto. Verifique as permissões de leitura (RLS) lá.');
-      const escolhida = selTabela.value || palpiteTabelaDefensivos(defensivosTabelas);
-      selTabela.innerHTML = defensivosTabelas.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-      selTabela.value = escolhida;
-    }
-
-    const tabela = selTabela.value;
-    if(!tabela){ status.textContent = 'Escolha uma tabela de origem.'; return; }
-
     status.textContent = 'Carregando registros de "'+tabela+'"...';
     const {data, error} = await sbAplic.from(tabela).select('*').limit(5000);
     if(error) throw new Error(error.message);
@@ -2278,6 +2306,7 @@ async function carregarDefensivos(forcar){
     defensivosLinhas = data || [];
     defensivosColunas = defensivosLinhas.length ? Object.keys(defensivosLinhas[0]) : [];
     localStorage.setItem(APLIC_TABELA_KEY, tabela);
+    if(manual.value.trim()) manual.value = tabela;
 
     // Popula o seletor de coluna de data com as colunas que parecem datas.
     const selData = document.getElementById('df-coluna-data');
@@ -2292,12 +2321,16 @@ async function carregarDefensivos(forcar){
 
     status.textContent = defensivosLinhas.length
       ? ''
-      : 'A tabela "'+tabela+'" não retornou registros (pode estar vazia ou sem permissão de leitura).';
+      : 'A tabela "'+tabela+'" não retornou registros (pode estar vazia ou sem permissão de leitura para a chave pública).';
     paginaDef = 1;
     renderDefensivos();
   }catch(e){
     console.error(e);
-    status.textContent = 'Não foi possível carregar os dados: '+e.message;
+    const msg = e.message||'';
+    const ehBloqueio = /failed to fetch|networkerror|load failed/i.test(msg);
+    status.textContent = ehBloqueio
+      ? 'Não foi possível conectar ao Controle de Aplicação. Confirme que o netlify.toml atualizado (com '+APLIC_URL+' em connect-src) foi publicado.'
+      : 'Não foi possível ler a tabela "'+tabela+'": '+msg+'. Verifique o nome da tabela e se a leitura está liberada para a chave pública (RLS) naquele projeto.';
     defensivosLinhas = []; defensivosColunas = [];
     renderDefensivos();
   }
