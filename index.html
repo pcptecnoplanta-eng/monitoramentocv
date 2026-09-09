@@ -543,13 +543,9 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   <div class="card">
     <div class="ct">Planilha de Registro de Produção</div>
     <div class="ms" style="margin-bottom:1rem;">
-      Envie o arquivo <strong>Registro de Produção</strong> em <strong>.xlsx</strong>. O app lê a aba
-      <strong>"Rel Geral"</strong> e extrai, para cada lote, o enraizamento ponderado da coluna
-      <strong>N (ENR %)</strong>. Cada novo envio substitui completamente o anterior.
-      <br><br>
-      Se o seu arquivo é <strong>.xlsb</strong>, abra-o no Excel e use <em>Arquivo → Salvar como →
-      Pasta de Trabalho do Excel (*.xlsx)</em> antes de enviar: alguns .xlsb usam recursos internos
-      que não conseguimos ler no navegador.
+      Envie o arquivo <strong>Registro de Produção</strong> (<strong>.xlsb</strong> ou <strong>.xlsx</strong>).
+      O app lê a aba <strong>"Rel Geral"</strong> e extrai, para cada lote, o enraizamento ponderado
+      da coluna <strong>N (ENR %)</strong>. Cada novo envio substitui completamente o anterior.
     </div>
     <div class="g2" style="align-items:end;">
       <div class="field">
@@ -2225,6 +2221,202 @@ let arquivoPlanilha = null;
 let paginaCruz = 1;
 let cruzamentoAtual = [];
 
+// ══════════════ LEITOR DE .XLSB (BIFF12) ══════════════
+// Alguns .xlsb do Excel usam recursos que a biblioteca genérica não
+// consegue interpretar (erro "Bad SerAr"). Este leitor extrai apenas os
+// valores das células e ignora qualquer registro que não conheça, o que o
+// torna bem mais tolerante a esses arquivos.
+
+async function inflarRaw(bytes){
+  if(typeof DecompressionStream === 'undefined'){
+    throw new Error('Seu navegador não suporta a descompactação necessária para ler .xlsb. Use o Chrome/Edge atualizado ou envie a planilha em .xlsx.');
+  }
+  const fluxo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(fluxo).arrayBuffer());
+}
+
+function xlsbLerZipIndice(bytes){
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  for(let i = bytes.length-22; i >= 0 && i > bytes.length-22-65558; i--){
+    if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if(eocd < 0) throw new Error('O arquivo não parece ser um .xlsb válido.');
+
+  let nEntradas = dv.getUint16(eocd+10, true);
+  let inicioCD  = dv.getUint32(eocd+16, true);
+  if(inicioCD === 0xFFFFFFFF || nEntradas === 0xFFFF){
+    for(let i = eocd-20; i >= 0; i--){
+      if(dv.getUint32(i, true) === 0x07064b50){
+        const off64 = Number(dv.getBigUint64(i+8, true));
+        if(dv.getUint32(off64, true) === 0x06064b50){
+          nEntradas = Number(dv.getBigUint64(off64+32, true));
+          inicioCD  = Number(dv.getBigUint64(off64+48, true));
+        }
+        break;
+      }
+    }
+  }
+
+  const dec = new TextDecoder('utf-8');
+  const indice = {};
+  let p = inicioCD;
+  for(let i = 0; i < nEntradas; i++){
+    if(dv.getUint32(p, true) !== 0x02014b50) break;
+    const metodo    = dv.getUint16(p+10, true);
+    let tamComp     = dv.getUint32(p+20, true);
+    const nomeLen   = dv.getUint16(p+28, true);
+    const extraLen  = dv.getUint16(p+30, true);
+    const comentLen = dv.getUint16(p+32, true);
+    let offLocal    = dv.getUint32(p+42, true);
+    const nome      = dec.decode(bytes.subarray(p+46, p+46+nomeLen));
+
+    if(tamComp === 0xFFFFFFFF || offLocal === 0xFFFFFFFF){
+      let e = p+46+nomeLen; const fim = e+extraLen;
+      while(e < fim){
+        const id = dv.getUint16(e, true), tam = dv.getUint16(e+2, true);
+        if(id === 0x0001){
+          let q = e+4;
+          if(dv.getUint32(p+24, true) === 0xFFFFFFFF) q += 8;
+          if(tamComp === 0xFFFFFFFF){ tamComp = Number(dv.getBigUint64(q, true)); q += 8; }
+          if(offLocal === 0xFFFFFFFF){ offLocal = Number(dv.getBigUint64(q, true)); }
+          break;
+        }
+        e += 4 + tam;
+      }
+    }
+    indice[nome] = {offLocal, tamComp, metodo};
+    p += 46 + nomeLen + extraLen + comentLen;
+  }
+  return indice;
+}
+
+function xlsbFatiar(bytes, entrada){
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const p = entrada.offLocal;
+  if(dv.getUint32(p, true) !== 0x04034b50) throw new Error('Entrada interna do .xlsb corrompida.');
+  const ini = p + 30 + dv.getUint16(p+26, true) + dv.getUint16(p+28, true);
+  return bytes.subarray(ini, ini + entrada.tamComp);
+}
+
+// Cada registro: tipo (1-2 bytes) + tamanho (1-4 bytes), ambos com 7 bits
+// úteis por byte. Registros desconhecidos são simplesmente pulados.
+function xlsbPercorrer(buf, aoEncontrar){
+  let p = 0; const n = buf.length;
+  while(p < n){
+    let tipo = buf[p++];
+    if(tipo & 0x80){
+      if(p >= n) break;
+      tipo = (tipo & 0x7F) | ((buf[p++] & 0x7F) << 7);
+    }
+    let tam = 0, desloc = 0;
+    for(let i = 0; i < 4; i++){
+      if(p >= n) return;
+      const b = buf[p++];
+      tam |= (b & 0x7F) << desloc; desloc += 7;
+      if(!(b & 0x80)) break;
+    }
+    if(p + tam > n) return;
+    aoEncontrar(tipo, buf.subarray(p, p + tam));
+    p += tam;
+  }
+}
+
+function xlsbStringLarga(buf, pos){
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const qtd = dv.getUint32(pos, true);
+  if(qtd === 0xFFFFFFFF) return {texto:'', proximo: pos+4};
+  let texto = '';
+  for(let i = 0; i < qtd; i++) texto += String.fromCharCode(dv.getUint16(pos+4+i*2, true));
+  return {texto, proximo: pos + 4 + qtd*2};
+}
+
+function xlsbRk(dv, pos){
+  const bruto = dv.getUint32(pos, true);
+  const div100 = (bruto & 1) !== 0;
+  let valor;
+  if(bruto & 2){
+    valor = bruto >> 2;
+    if(valor & 0x20000000) valor -= 0x40000000;
+  } else {
+    const tmp = new DataView(new ArrayBuffer(8));
+    tmp.setUint32(4, bruto & 0xFFFFFFFC, true);
+    valor = tmp.getFloat64(0, true);
+  }
+  return div100 ? valor/100 : valor;
+}
+
+function xlsbLerAba(buf, sst){
+  const linhas = []; let linhaAtual = -1;
+  xlsbPercorrer(buf, (tipo, dados)=>{
+    if(tipo === 0){ // BrtRowHdr
+      const dv = new DataView(dados.buffer, dados.byteOffset, dados.byteLength);
+      linhaAtual = dv.getUint32(0, true);
+      return;
+    }
+    if(tipo < 1 || tipo > 11) return; // fora das células
+    const dv = new DataView(dados.buffer, dados.byteOffset, dados.byteLength);
+    const coluna = dv.getUint32(0, true);
+    let valor = null;
+    switch(tipo){
+      case 2:  valor = xlsbRk(dv, 8); break;                 // RK
+      case 5: case 9: valor = dv.getFloat64(8, true); break; // Real / Fórmula numérica
+      case 4: case 10: valor = dados[8] !== 0; break;        // Bool
+      case 7:  valor = sst[dv.getUint32(8, true)] ?? null; break; // Shared string
+      case 6: case 8: valor = xlsbStringLarga(dados, 8).texto; break;
+      default: valor = null;
+    }
+    if(!linhas[linhaAtual]) linhas[linhaAtual] = [];
+    linhas[linhaAtual][coluna] = valor;
+  });
+
+  const largura = linhas.reduce((m,l)=> Math.max(m, l ? l.length : 0), 0);
+  const saida = [];
+  for(let i = 0; i < linhas.length; i++){
+    const l = linhas[i] || [];
+    const nova = new Array(largura).fill(null);
+    for(let j = 0; j < l.length; j++) if(l[j] !== undefined) nova[j] = l[j];
+    saida.push(nova);
+  }
+  return saida;
+}
+
+// Lê uma aba específica de um .xlsb e devolve matriz de linhas.
+async function lerAbaXlsb(arrayBuffer, nomeAbaDesejada){
+  const bytes = new Uint8Array(arrayBuffer);
+  const indice = xlsbLerZipIndice(bytes);
+  const obter = async (nome)=>{
+    const e = indice[nome];
+    if(!e) throw new Error('Parte "'+nome+'" não encontrada no arquivo.');
+    const cru = xlsbFatiar(bytes, e);
+    return e.metodo === 0 ? cru : await inflarRaw(cru);
+  };
+
+  const abas = [];
+  xlsbPercorrer(await obter('xl/workbook.bin'), (tipo, dados)=>{
+    if(tipo !== 156) return; // BrtBundleSh
+    const rel = xlsbStringLarga(dados, 8);
+    abas.push({relId: rel.texto, nome: xlsbStringLarga(dados, rel.proximo).texto});
+  });
+
+  const alvo = abas.find(a=> a.nome.trim().toLowerCase() === nomeAbaDesejada.trim().toLowerCase());
+  if(!alvo) throw new Error('A aba "'+nomeAbaDesejada+'" não foi encontrada. Abas do arquivo: '+abas.map(a=>a.nome).join(', '));
+
+  const rels = new TextDecoder().decode(await obter('xl/_rels/workbook.bin.rels'));
+  const mapa = {};
+  for(const m of rels.matchAll(/Id="([^"]+)"[^>]*Target="([^"]+)"/g)) mapa[m[1]] = m[2];
+  const alvoCaminho = (mapa[alvo.relId]||'').replace(/^\/?(xl\/)?/, 'xl/');
+  if(!alvoCaminho) throw new Error('Não foi possível localizar os dados da aba "'+nomeAbaDesejada+'".');
+
+  let sst = [];
+  if(indice['xl/sharedStrings.bin']){
+    xlsbPercorrer(await obter('xl/sharedStrings.bin'), (tipo, dados)=>{
+      if(tipo === 19) sst.push(xlsbStringLarga(dados, 1).texto);
+    });
+  }
+  return xlsbLerAba(await obter(alvoCaminho), sst);
+}
+
 function onEscolherPlanilha(){
   const input = document.getElementById('pl-arquivo');
   arquivoPlanilha = input.files && input.files[0] ? input.files[0] : null;
@@ -2257,27 +2449,25 @@ function localizarColunasRelGeral(linhas){
   return null;
 }
 
-function processarPlanilha(arrayBuffer){
+// Obtém as linhas da aba "Rel Geral". Para .xlsb usamos o leitor próprio
+// (mais tolerante); para .xlsx/.xlsm, a biblioteca padrão dá conta.
+async function obterLinhasRelGeral(arrayBuffer, nomeArquivo){
+  if(/\.xlsb$/i.test(nomeArquivo||'')){
+    return await lerAbaXlsb(arrayBuffer, 'Rel Geral');
+  }
   let wb;
   try{
     wb = XLSX.read(new Uint8Array(arrayBuffer), {type:'array'});
   }catch(e){
-    // Alguns arquivos .xlsb usam recursos que a biblioteca de leitura não
-    // suporta (ex.: "Bad SerAr"). Nesses casos, salvar como .xlsx no Excel
-    // resolve, porque o .xlsx é totalmente suportado.
-    const ehXlsb = /\.xlsb$/i.test(arquivoPlanilha ? arquivoPlanilha.name : '');
-    if(ehXlsb){
-      throw new Error('Não foi possível ler este arquivo .xlsb (' + e.message + '). '
-        + 'Abra a planilha no Excel e use "Salvar como" escolhendo "Pasta de Trabalho do Excel (*.xlsx)", '
-        + 'depois envie o .xlsx aqui.');
-    }
     throw new Error('Não foi possível ler o arquivo: '+e.message);
   }
-
   const nomeAba = wb.SheetNames.find(n=> n.trim().toLowerCase()==='rel geral');
   if(!nomeAba) throw new Error('A aba "Rel Geral" não foi encontrada nesta planilha.');
+  return XLSX.utils.sheet_to_json(wb.Sheets[nomeAba], {header:1, defval:null, raw:true});
+}
 
-  const linhas = XLSX.utils.sheet_to_json(wb.Sheets[nomeAba], {header:1, defval:null, raw:true});
+async function processarPlanilha(arrayBuffer, nomeArquivo){
+  const linhas = await obterLinhasRelGeral(arrayBuffer, nomeArquivo);
   const cols = localizarColunasRelGeral(linhas);
   if(!cols) throw new Error('Não encontrei as colunas "Lote" e "ENR %" na aba "Rel Geral".');
 
@@ -2330,21 +2520,22 @@ async function enviarPlanilha(){
 
   try{
     const buffer = await arquivoPlanilha.arrayBuffer();
-    const resultado = processarPlanilha(buffer);
+    const nomeArquivo = arquivoPlanilha.name;
+    const resultado = await processarPlanilha(buffer, nomeArquivo);
     if(!resultado.totalLotes) throw new Error('Nenhum lote encontrado na aba "Rel Geral".');
 
     status.textContent = 'Salvando '+resultado.totalLotes+' lotes...';
     const {error} = await sb.from('planilha_rel_geral').upsert({
       id: 1,
       dados: resultado.lotes,
-      arquivo_nome: arquivoPlanilha.name,
+      arquivo_nome: nomeArquivo,
       total_lotes: resultado.totalLotes,
       enviado_em: new Date().toISOString(),
       enviado_por: usuarioAtual ? usuarioAtual.email : null
     }, {onConflict:'id'});
     if(error){ avisoErroSupabase('salvar a planilha', error); status.textContent = 'Falha ao salvar.'; return; }
 
-    registrarEvento('planilha_enviada', arquivoPlanilha.name+' ('+resultado.totalLotes+' lotes)', usuarioAtual?.email);
+    registrarEvento('planilha_enviada', nomeArquivo+' ('+resultado.totalLotes+' lotes)', usuarioAtual?.email);
     status.textContent = 'Planilha processada: '+resultado.totalLotes+' lotes salvos (substituiu a anterior).';
     document.getElementById('pl-arquivo').value = '';
     arquivoPlanilha = null;
