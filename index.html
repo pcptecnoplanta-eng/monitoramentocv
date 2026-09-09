@@ -407,8 +407,14 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
           <option value="">Todas</option>
         </select>
       </div>
-      <div class="field"><label>Data início</label><input type="date" id="fi-data-ini" onchange="aplicarFiltrosDashboard()"></div>
-      <div class="field"><label>Data fim</label><input type="date" id="fi-data-fim" onchange="aplicarFiltrosDashboard()"></div>
+      <div class="field"><label>Avaliação — início</label><input type="date" id="fi-data-ini" onchange="aplicarFiltrosDashboard()"></div>
+      <div class="field"><label>Avaliação — fim</label><input type="date" id="fi-data-fim" onchange="aplicarFiltrosDashboard()"></div>
+      <div></div>
+    </div>
+    <div class="g4">
+      <div class="field"><label>Plantio — início</label><input type="date" id="fi-plantio-ini" onchange="aplicarFiltrosDashboard()"></div>
+      <div class="field"><label>Plantio — fim</label><input type="date" id="fi-plantio-fim" onchange="aplicarFiltrosDashboard()"></div>
+      <div></div>
       <div class="field" style="justify-content:flex-end;"><button class="btn bs" onclick="limparFiltros()">Limpar filtros</button></div>
     </div>
   </div>
@@ -1644,6 +1650,8 @@ function limparFiltros(){
   renderClonePanel();
   document.getElementById('fi-data-ini').value='';
   document.getElementById('fi-data-fim').value='';
+  document.getElementById('fi-plantio-ini').value='';
+  document.getElementById('fi-plantio-fim').value='';
   paginaDash = 1;
   renderDashboard();
 }
@@ -1667,6 +1675,8 @@ function getFiltrados(){
   const faixaIdade = document.getElementById('fi-idade').value;
   const dIni = document.getElementById('fi-data-ini').value;
   const dFim = document.getElementById('fi-data-fim').value;
+  const pIni = document.getElementById('fi-plantio-ini').value;
+  const pFim = document.getElementById('fi-plantio-fim').value;
 
   return db.filter(r=>{
     if(un && r.unidade!==un) return false;
@@ -1680,6 +1690,8 @@ function getFiltrados(){
     if(faixaIdade && faixaDaIdade(calcularIdadeDias(r.data, r.plantio))!==faixaIdade) return false;
     if(dIni && r.data<dIni) return false;
     if(dFim && r.data>dFim) return false;
+    if(pIni && (!r.plantio || r.plantio<pIni)) return false;
+    if(pFim && (!r.plantio || r.plantio>pFim)) return false;
     return true;
   });
 }
