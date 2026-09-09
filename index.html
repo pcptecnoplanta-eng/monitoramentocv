@@ -244,22 +244,6 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   </div>
 </div>
 
-<!-- ══════════ MODAL: CONFIRMAR SENHA DE ADMIN ══════════ -->
-<div id="modal-senha-admin" class="modal-overlay">
-  <div class="auth-box" style="max-width:380px;">
-    <div class="auth-title" style="font-size:16px;">Confirmar identidade</div>
-    <div class="auth-sub">Por segurança, confirme sua senha de administrador para continuar.</div>
-    <div class="auth-field">
-      <label>Senha</label>
-      <input type="password" id="modal-senha-input" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <div style="display:flex;gap:10px;margin-top:.5rem;">
-      <button type="button" class="btn bs" style="flex:1;" id="modal-senha-cancelar">Cancelar</button>
-      <button type="button" class="btn bp" style="flex:1;" id="modal-senha-confirmar">Confirmar</button>
-    </div>
-  </div>
-</div>
-
 <div id="app-content" style="display:none;">
 <header>
   <div style="display:flex;align-items:center;gap:12px;">
@@ -283,6 +267,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   <button class="nt active" data-page="page-lancamento" onclick="trocarAba('page-lancamento',this)">Lançamento</button>
   <button class="nt" data-page="page-dashboard" onclick="trocarAba('page-dashboard',this)">Dashboard</button>
   <button class="nt" data-page="page-planilha" onclick="trocarAba('page-planilha',this)">Planilha</button>
+  <button class="nt" data-page="page-defensivos" onclick="trocarAba('page-defensivos',this)">Defensivos</button>
   <button class="nt" data-page="page-config" onclick="trocarAba('page-config',this)">Configurações</button>
 </nav>
 
@@ -629,6 +614,53 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   </div>
 </div>
 
+<!-- ═══════════════ DEFENSIVOS ═══════════════ -->
+<div class="page" id="page-defensivos">
+
+  <div class="card">
+    <div class="ltb">
+      <div class="ct" style="margin-bottom:0;">Aplicação de defensivos</div>
+      <div class="xb">
+        <span class="lc" id="df-count">0 registros</span>
+        <button class="btn bs" style="padding:5px 12px;font-size:11px;" onclick="carregarDefensivos(true)">Atualizar</button>
+        <button class="btn be" style="padding:5px 12px;font-size:11px;" onclick="exportarDefensivos()">Exportar Excel</button>
+      </div>
+    </div>
+    <div class="ms" style="margin-bottom:.75rem;">
+      Dados do sistema <strong>Controle de Aplicação</strong>. Somente leitura — os registros são
+      lançados naquele sistema, aqui apenas consultamos.
+    </div>
+
+    <div class="g4" style="margin-bottom:10px;">
+      <div class="field"><label>Tabela de origem</label>
+        <select id="df-tabela" onchange="onTrocarTabelaDefensivos()">
+          <option value="">Carregando...</option>
+        </select>
+      </div>
+      <div class="field"><label>Buscar</label><input type="text" id="df-busca" placeholder="Defensivo, clone, lote..." oninput="paginaDef=1;renderDefensivos()"></div>
+      <div class="field"><label>Data — início</label><input type="date" id="df-data-ini" onchange="paginaDef=1;renderDefensivos()"></div>
+      <div class="field"><label>Data — fim</label><input type="date" id="df-data-fim" onchange="paginaDef=1;renderDefensivos()"></div>
+    </div>
+    <div class="filtro-rodape" style="margin-bottom:10px;">
+      <div class="field" style="max-width:260px;"><label>Coluna de data usada no filtro</label>
+        <select id="df-coluna-data" onchange="paginaDef=1;renderDefensivos()"><option value="">Nenhuma</option></select>
+      </div>
+      <button class="btn bs" style="margin-left:auto;" onclick="limparFiltrosDefensivos()">Limpar filtros</button>
+    </div>
+
+    <div class="ms" id="df-status" style="margin-bottom:.75rem;"></div>
+
+    <div class="tw">
+      <table id="df-tabela-dados">
+        <thead><tr id="df-thead"></tr></thead>
+        <tbody id="df-tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="df-empty" style="display:none;">Nenhum registro encontrado.</div>
+    <div class="pagination" id="pag-def"></div>
+  </div>
+</div>
+
 <!-- ═══════════════ CONFIGURAÇÕES ═══════════════ -->
 <div class="page" id="page-config">
 
@@ -897,58 +929,17 @@ async function registrarEvento(tipo, detalhe, emailUsuario){
   }catch(e){ console.warn('Falha ao registrar auditoria:', e); }
 }
 
-// Depois de recarregar a página, a sessão é restaurada pelo token — mas a
-// senha não fica guardada em lugar nenhum. Para qualquer ação de admin
-// (aprovar, remover, listar usuários...), pedimos a senha de novo aqui,
-// só uma vez por sessão de navegação, e ela é conferida no banco.
-// Mostra o modal de confirmação de senha e devolve o que a pessoa digitou
-// (ou null se cancelou). Usa um <input type="password"> de verdade, então
-// o texto aparece mascarado — diferente do prompt() nativo do navegador.
-function pedirSenhaModal(){
-  return new Promise((resolve)=>{
-    const overlay = document.getElementById('modal-senha-admin');
-    const input = document.getElementById('modal-senha-input');
-    const btnConfirmar = document.getElementById('modal-senha-confirmar');
-    const btnCancelar = document.getElementById('modal-senha-cancelar');
-    input.value = '';
-    overlay.classList.add('open');
-    setTimeout(()=>input.focus(), 50);
-
-    function limpar(){
-      overlay.classList.remove('open');
-      btnConfirmar.removeEventListener('click', onConfirmar);
-      btnCancelar.removeEventListener('click', onCancelar);
-      input.removeEventListener('keydown', onKeydown);
-    }
-    function onConfirmar(){ const v = input.value; limpar(); resolve(v || null); }
-    function onCancelar(){ limpar(); resolve(null); }
-    function onKeydown(e){
-      if(e.key==='Enter'){ e.preventDefault(); onConfirmar(); }
-      else if(e.key==='Escape'){ onCancelar(); }
-    }
-
-    btnConfirmar.addEventListener('click', onConfirmar);
-    btnCancelar.addEventListener('click', onCancelar);
-    input.addEventListener('keydown', onKeydown);
-  });
-}
-
-async function garantirSenhaAdmin(){
-  if(usuarioAtualSenha) return true;
-  const senha = await pedirSenhaModal();
-  if(!senha) return false;
-  const {data, error} = await sb.rpc('eh_admin_valido', {p_admin_email: usuarioAtual.email, p_admin_senha: senha});
-  if(error || !data){ alert('Senha incorreta.'); return false; }
-  usuarioAtualSenha = senha;
-  return true;
+// As ações administrativas são autorizadas pelo token de sessão (o mesmo
+// que mantém o login), validado no banco a cada chamada — ele confere que
+// a sessão existe, não expirou e pertence a um admin aprovado. Por isso
+// não é preciso digitar a senha de novo depois de atualizar a página.
+function tokenSessao(){
+  return localStorage.getItem(SESSION_KEY) || '';
 }
 
 async function carregarUsuarios(){
   if(!usuarioAtual || usuarioAtual.permissao!=='admin') return;
-  if(!(await garantirSenhaAdmin())) return;
-  const {data, error} = await sb.rpc('listar_usuarios', {
-    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha
-  });
+  const {data, error} = await sb.rpc('listar_usuarios_sessao', {p_token: tokenSessao()});
   if(error){ avisoErroSupabase('carregar usuários', error); return; }
   usuarios = data || [];
 }
@@ -966,9 +957,6 @@ const LOGIN_BLOQUEIO_MS = 30000;
 
 let usuarios = [];
 let usuarioAtual = null;
-// Guardada só em memória (nunca em localStorage) enquanto a sessão de admin
-// dura, para autorizar as ações administrativas — nunca fica salva em disco.
-let usuarioAtualSenha = null;
 
 function normalizarEmail(e){ return (e||'').trim().toLowerCase(); }
 
@@ -1039,7 +1027,6 @@ async function doLogin(){
       mostrarTelaPendente();
       return;
     }
-    usuarioAtualSenha = senha;
     if(usuario.token) localStorage.setItem(SESSION_KEY, usuario.token);
     registrarEvento('login_sucesso', null, email);
     iniciarSessao(usuario);
@@ -1096,7 +1083,6 @@ async function doRegister(){
     registrarEvento('conta_criada', novo.permissao+(novo.permissao_solicitada?' (pediu '+novo.permissao_solicitada+')':''), email);
 
     if(novo.status === 'aprovado'){
-      usuarioAtualSenha = senha;
       if(novo.token) localStorage.setItem(SESSION_KEY, novo.token);
       if(novo.permissao_solicitada){
         // Mostra o aviso rapidinho antes de entrar, já que a tela vai trocar.
@@ -1163,7 +1149,6 @@ async function doLogout(){
     catch(e){ console.warn('Falha ao encerrar sessão no servidor:', e); }
   }
   usuarioAtual = null;
-  usuarioAtualSenha = null;
   localStorage.removeItem(SESSION_KEY);
   document.getElementById('app-content').style.display = 'none';
   document.getElementById('auth-pending-screen').style.display = 'none';
@@ -1179,9 +1164,11 @@ function aplicarPermissoes(){
   const btnDash = document.querySelector('.nt[data-page="page-dashboard"]');
   const btnCfg = document.querySelector('.nt[data-page="page-config"]');
   const btnPlan = document.querySelector('.nt[data-page="page-planilha"]');
+  const btnDef = document.querySelector('.nt[data-page="page-defensivos"]');
   btnLanc.style.display = (p==='admin' || p==='editor') ? '' : 'none';
   btnDash.style.display = '';
   btnPlan.style.display = (p==='admin' || p==='editor') ? '' : 'none';
+  btnDef.style.display = '';
   btnCfg.style.display = (p==='admin') ? '' : 'none';
 
   document.getElementById('hd-user-name').textContent = usuarioAtual.nome || usuarioAtual.email;
@@ -1215,9 +1202,7 @@ function renderAprovacoes(){
 }
 
 async function aprovarUsuario(email){
-  const {error} = await sb.rpc('aprovar_usuario', {
-    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
-  });
+  const {error} = await sb.rpc('aprovar_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email});
   if(error){ avisoErroSupabase('aprovar usuário', error); return; }
   registrarEvento('usuario_aprovado', email, usuarioAtual.email);
   await carregarUsuarios();
@@ -1228,9 +1213,7 @@ async function aprovarUsuario(email){
 
 async function recusarUsuario(email){
   if(!confirm('Recusar e excluir esta solicitação de acesso?')) return;
-  const {error} = await sb.rpc('recusar_usuario', {
-    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
-  });
+  const {error} = await sb.rpc('recusar_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email});
   if(error){ avisoErroSupabase('recusar usuário', error); return; }
   registrarEvento('usuario_recusado', email, usuarioAtual.email);
   await carregarUsuarios();
@@ -1276,9 +1259,7 @@ function renderSolicitacoesUpgrade(){
 }
 
 async function promoverUsuarioEditor(email){
-  const {error} = await sb.rpc('promover_usuario_editor', {
-    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
-  });
+  const {error} = await sb.rpc('promover_usuario_editor_sessao', {p_token: tokenSessao(), p_alvo_email: email});
   if(error){ avisoErroSupabase('promover usuário', error); return; }
   registrarEvento('usuario_promovido_editor', email, usuarioAtual.email);
   await carregarUsuarios();
@@ -1288,9 +1269,7 @@ async function promoverUsuarioEditor(email){
 
 async function recusarPromocaoUsuario(email){
   if(!confirm('Recusar o pedido de acesso como Editor? A pessoa continua como Visualizador.')) return;
-  const {error} = await sb.rpc('recusar_promocao_usuario', {
-    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
-  });
+  const {error} = await sb.rpc('recusar_promocao_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email});
   if(error){ avisoErroSupabase('recusar promoção', error); return; }
   registrarEvento('promocao_recusada', email, usuarioAtual.email);
   await carregarUsuarios();
@@ -1300,10 +1279,7 @@ async function recusarPromocaoUsuario(email){
 
 async function alterarPermissaoUsuario(email, novaPermissao){
   if(email === ADMIN_EMAIL) return;
-  const {error} = await sb.rpc('alterar_permissao_usuario', {
-    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha,
-    p_alvo_email: email, p_nova_permissao: novaPermissao
-  });
+  const {error} = await sb.rpc('alterar_permissao_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email, p_nova_permissao: novaPermissao});
   if(error){ avisoErroSupabase('alterar permissão', error); return; }
   registrarEvento('permissao_alterada', email+' -> '+novaPermissao, usuarioAtual.email);
   await carregarUsuarios();
@@ -1314,9 +1290,7 @@ async function alterarPermissaoUsuario(email, novaPermissao){
 async function removerUsuario(email){
   if(email === ADMIN_EMAIL){ alert('Não é possível remover o administrador principal.'); return; }
   if(!confirm('Remover o acesso deste usuário?')) return;
-  const {error} = await sb.rpc('remover_usuario', {
-    p_admin_email: usuarioAtual.email, p_admin_senha: usuarioAtualSenha, p_alvo_email: email
-  });
+  const {error} = await sb.rpc('remover_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email});
   if(error){ avisoErroSupabase('remover usuário', error); return; }
   registrarEvento('usuario_removido', email, usuarioAtual.email);
   await carregarUsuarios();
@@ -1686,6 +1660,9 @@ function trocarAba(pageId, btn){
   if(pageId==='page-dashboard'){
     popularFiltros(); renderDashboard();
     Promise.all([carregarLancamentos(), carregarPlanilha()]).then(()=>{ popularFiltros(); renderDashboard(); });
+  }
+  if(pageId==='page-defensivos'){
+    carregarDefensivos(false);
   }
   if(pageId==='page-planilha'){
     renderPlanilha();
@@ -2232,6 +2209,183 @@ function renderGraficoPrincipal(filtrados){
   } else {
     statusClima.textContent = (climaDados && climaDados.erro) ? climaDados.erro : '';
   }
+}
+
+// ══════════════════ DEFENSIVOS (projeto Controle de Aplicação) ══════════
+// Este é um segundo projeto Supabase, só de leitura. Como não sabemos de
+// antemão o nome das tabelas de lá, o app pergunta ao próprio PostgREST
+// quais existem (endpoint raiz devolve um OpenAPI com a lista) e tenta
+// escolher sozinho a que parece ser a de aplicações.
+const APLIC_URL = 'https://awbyfboedszwczukxqzo.supabase.co';
+const APLIC_KEY = 'sb_publishable_d7sIlkDbmhStHgFAUALMLw_w8XPh5Ei';
+const APLIC_TABELA_KEY = 'defensivos_tabela_v1';
+const sbAplic = window.supabase.createClient(APLIC_URL, APLIC_KEY);
+
+let defensivosLinhas = [];
+let defensivosColunas = [];
+let defensivosTabelas = [];
+let paginaDef = 1;
+
+// Pergunta ao PostgREST quais tabelas existem no projeto.
+async function listarTabelasAplic(){
+  const resp = await fetch(APLIC_URL+'/rest/v1/', {headers:{apikey: APLIC_KEY, Authorization:'Bearer '+APLIC_KEY}});
+  if(!resp.ok) throw new Error('HTTP '+resp.status);
+  const spec = await resp.json();
+  const caminhos = Object.keys(spec.paths || {});
+  return caminhos.filter(c=> c.startsWith('/') && c.length>1 && !c.includes('{') && !c.startsWith('/rpc/'))
+                 .map(c=> c.slice(1)).sort();
+}
+
+// Escolhe a tabela mais provável quando o usuário ainda não escolheu.
+function palpiteTabelaDefensivos(tabelas){
+  const salva = localStorage.getItem(APLIC_TABELA_KEY);
+  if(salva && tabelas.includes(salva)) return salva;
+  const pontuar = (t)=>{
+    const n = t.toLowerCase();
+    let p = 0;
+    if(n.includes('aplica')) p += 5;
+    if(n.includes('defensiv')) p += 5;
+    if(n.includes('produto')) p += 2;
+    if(n.includes('pulveriz')) p += 3;
+    if(n.includes('registro')) p += 1;
+    return p;
+  };
+  const ordenadas = [...tabelas].sort((a,b)=> pontuar(b)-pontuar(a));
+  return (ordenadas.length && pontuar(ordenadas[0])>0) ? ordenadas[0] : (tabelas[0]||'');
+}
+
+async function carregarDefensivos(forcar){
+  const status = document.getElementById('df-status');
+  const selTabela = document.getElementById('df-tabela');
+
+  try{
+    if(!defensivosTabelas.length || forcar){
+      status.textContent = 'Conectando ao Controle de Aplicação...';
+      defensivosTabelas = await listarTabelasAplic();
+      if(!defensivosTabelas.length) throw new Error('Nenhuma tabela visível neste projeto. Verifique as permissões de leitura (RLS) lá.');
+      const escolhida = selTabela.value || palpiteTabelaDefensivos(defensivosTabelas);
+      selTabela.innerHTML = defensivosTabelas.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+      selTabela.value = escolhida;
+    }
+
+    const tabela = selTabela.value;
+    if(!tabela){ status.textContent = 'Escolha uma tabela de origem.'; return; }
+
+    status.textContent = 'Carregando registros de "'+tabela+'"...';
+    const {data, error} = await sbAplic.from(tabela).select('*').limit(5000);
+    if(error) throw new Error(error.message);
+
+    defensivosLinhas = data || [];
+    defensivosColunas = defensivosLinhas.length ? Object.keys(defensivosLinhas[0]) : [];
+    localStorage.setItem(APLIC_TABELA_KEY, tabela);
+
+    // Popula o seletor de coluna de data com as colunas que parecem datas.
+    const selData = document.getElementById('df-coluna-data');
+    const anterior = selData.value;
+    const candidatas = defensivosColunas.filter(c=>{
+      if(/data|date|dia|dt_/i.test(c)) return true;
+      const v = defensivosLinhas.find(l=> l[c]!=null)?.[c];
+      return typeof v==='string' && /^\d{4}-\d{2}-\d{2}/.test(v);
+    });
+    selData.innerHTML = '<option value="">Nenhuma</option>' + candidatas.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    selData.value = candidatas.includes(anterior) ? anterior : (candidatas[0] || '');
+
+    status.textContent = defensivosLinhas.length
+      ? ''
+      : 'A tabela "'+tabela+'" não retornou registros (pode estar vazia ou sem permissão de leitura).';
+    paginaDef = 1;
+    renderDefensivos();
+  }catch(e){
+    console.error(e);
+    status.textContent = 'Não foi possível carregar os dados: '+e.message;
+    defensivosLinhas = []; defensivosColunas = [];
+    renderDefensivos();
+  }
+}
+
+function onTrocarTabelaDefensivos(){
+  paginaDef = 1;
+  carregarDefensivos(false);
+}
+
+function limparFiltrosDefensivos(){
+  document.getElementById('df-busca').value = '';
+  document.getElementById('df-data-ini').value = '';
+  document.getElementById('df-data-fim').value = '';
+  paginaDef = 1;
+  renderDefensivos();
+}
+
+function defensivosFiltrados(){
+  const busca = document.getElementById('df-busca').value.trim().toLowerCase();
+  const colData = document.getElementById('df-coluna-data').value;
+  const dIni = document.getElementById('df-data-ini').value;
+  const dFim = document.getElementById('df-data-fim').value;
+
+  return defensivosLinhas.filter(l=>{
+    if(busca){
+      const texto = defensivosColunas.map(c=> String(l[c] ?? '')).join(' ').toLowerCase();
+      if(!texto.includes(busca)) return false;
+    }
+    if(colData && (dIni || dFim)){
+      const bruto = l[colData];
+      if(!bruto) return false;
+      const dia = String(bruto).slice(0,10);
+      if(dIni && dia < dIni) return false;
+      if(dFim && dia > dFim) return false;
+    }
+    return true;
+  });
+}
+
+function formatarCelulaDefensivo(valor){
+  if(valor===null || valor===undefined) return '';
+  if(typeof valor === 'boolean') return valor ? 'Sim' : 'Não';
+  if(typeof valor === 'object') return JSON.stringify(valor);
+  const s = String(valor);
+  // Datas ISO viram dd/mm/aaaa para leitura mais fácil.
+  if(/^\d{4}-\d{2}-\d{2}(T|$)/.test(s)) return fmtData(s.slice(0,10));
+  return s;
+}
+
+function renderDefensivos(){
+  const lista = defensivosFiltrados();
+  document.getElementById('df-count').textContent = lista.length+' registro'+(lista.length!==1?'s':'');
+  document.getElementById('df-empty').style.display = lista.length ? 'none' : 'block';
+  document.getElementById('df-tabela-dados').style.display = lista.length ? 'table' : 'none';
+
+  document.getElementById('df-thead').innerHTML = defensivosColunas
+    .map(c=>`<th>${escapeHtml(c.replace(/_/g,' '))}</th>`).join('');
+
+  const totalPaginas = Math.max(1, Math.ceil(lista.length/ITENS_POR_PAGINA));
+  if(paginaDef>totalPaginas) paginaDef = totalPaginas;
+  if(paginaDef<1) paginaDef = 1;
+  const inicio = (paginaDef-1)*ITENS_POR_PAGINA;
+
+  document.getElementById('df-tbody').innerHTML = lista.slice(inicio, inicio+ITENS_POR_PAGINA).map(l=>
+    '<tr>'+defensivosColunas.map(c=>`<td>${escapeHtml(formatarCelulaDefensivo(l[c]))}</td>`).join('')+'</tr>'
+  ).join('');
+
+  renderPaginacao('pag-def', lista.length, paginaDef, 'irParaPaginaDef');
+}
+
+function irParaPaginaDef(n){
+  paginaDef = n;
+  renderDefensivos();
+}
+
+function exportarDefensivos(){
+  const lista = defensivosFiltrados();
+  if(!lista.length){ alert('Não há registros para exportar.'); return; }
+  const linhas = lista.map(l=>{
+    const o = {};
+    defensivosColunas.forEach(c=>{ o[c.replace(/_/g,' ')] = formatarCelulaDefensivo(l[c]); });
+    return o;
+  });
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Defensivos');
+  XLSX.writeFile(wb, 'defensivos_'+hoje()+'.xlsx');
 }
 
 // ══════════════════ PLANILHA DE REGISTRO DE PRODUÇÃO ══════════════════
@@ -2950,9 +3104,6 @@ async function tentarSessaoSalva(){
     document.getElementById('auth-screen').style.display = 'flex';
     return;
   }
-  // Sessão restaurada sem a senha em mãos: ações administrativas vão pedir
-  // a senha de novo na hora (ver garantirSenhaAdmin).
-  usuarioAtualSenha = null;
   if(userSalvo.status === 'aprovado'){
     iniciarSessao(userSalvo);
   } else if(userSalvo.status === 'pendente'){
