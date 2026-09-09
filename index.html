@@ -569,6 +569,16 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     </div>
   </div>
 
+  <div class="card" id="pl-grafico-card" style="display:none;">
+    <div class="ct">Enraizamento: avaliação × planilha, por lote</div>
+    <div class="ms" style="margin-bottom:.5rem;">
+      Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente).
+      Considera os filtros do Dashboard e os filtros desta aba.
+    </div>
+    <div class="chart-wrap"><canvas id="chart-cruzamento"></canvas></div>
+    <div class="empty" id="pl-grafico-empty" style="display:none;">Nenhum lote com os dois valores para comparar.</div>
+  </div>
+
   <div class="card" id="pl-cruz-card" style="display:none;">
     <div class="ltb">
       <div class="ct" style="margin-bottom:0;">Cruzamento por lote — avaliação × planilha</div>
@@ -595,7 +605,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     <div class="tw">
       <table id="pl-tabela">
         <thead><tr>
-          <th>Lote</th><th>Unidade</th><th>Clone</th><th>Avaliações</th>
+          <th>Lote</th><th>Plantio</th><th>Unidade</th><th>Clone</th><th>Avaliações</th>
           <th>Plantadas</th><th>Enraizadas</th><th>Enraiz. avaliação</th>
           <th>Produção (planilha)</th><th>Seleção (planilha)</th><th>ENR % planilha</th><th>Diferença</th>
         </tr></thead>
@@ -2220,6 +2230,7 @@ let planilhaDados = null;   // {lotes:{LOTE:{producao,selecao,enr,material,mes,d
 let arquivoPlanilha = null;
 let paginaCruz = 1;
 let cruzamentoAtual = [];
+let chartCruzamento = null;
 
 // ══════════════ LEITOR DE .XLSB (BIFF12) ══════════════
 // Alguns .xlsb do Excel usam recursos que a biblioteca genérica não
@@ -2556,15 +2567,16 @@ async function carregarPlanilha(){
 }
 
 // ── CRUZAMENTO: avaliações do app × ENR% da planilha, por lote ──────────
+// Usa os lançamentos já filtrados no Dashboard, então todos os filtros
+// (unidade, clone, espécie, período, idade etc.) valem aqui também.
 function calcularCruzamento(){
   const daPlanilha = (planilhaDados && planilhaDados.dados) ? planilhaDados.dados : {};
 
-  // Agrupa os lançamentos do app por lote (ponderado).
   const porLoteApp = {};
-  db.forEach(r=>{
+  getFiltrados().forEach(r=>{
     if(!r.lote) return;
     const lote = String(r.lote).trim();
-    if(!porLoteApp[lote]) porLoteApp[lote] = {plant:0, mort:0, enr:0, n:0, unidades:new Set(), clones:new Set()};
+    if(!porLoteApp[lote]) porLoteApp[lote] = {plant:0, mort:0, enr:0, n:0, unidades:new Set(), clones:new Set(), plantioMin:null};
     const g = porLoteApp[lote];
     g.plant += (r.plantadas||0);
     g.mort  += (r.mortas||0);
@@ -2572,15 +2584,22 @@ function calcularCruzamento(){
     g.n++;
     if(r.unidade) g.unidades.add(r.unidade);
     if(r.clone) g.clones.add(r.clone);
+    if(r.plantio && (!g.plantioMin || r.plantio < g.plantioMin)) g.plantioMin = r.plantio;
   });
 
-  return Object.keys(porLoteApp).sort().map(lote=>{
+  // Ordena pelo plantio mais antigo — é a ordem usada também no gráfico.
+  return Object.keys(porLoteApp).sort((a,b)=>{
+    const da = porLoteApp[a].plantioMin || '9999-99-99';
+    const db2 = porLoteApp[b].plantioMin || '9999-99-99';
+    return da.localeCompare(db2) || a.localeCompare(b);
+  }).map(lote=>{
     const g = porLoteApp[lote];
     const p = daPlanilha[lote] || null;
     const enrApp = g.plant ? (g.enr/g.plant)*100 : null;
     const enrPlan = (p && p.enr!==null && p.enr!==undefined) ? p.enr*100 : null;
     return {
       lote,
+      plantio: g.plantioMin,
       unidade: [...g.unidades].join(', '),
       clone: [...g.clones].join(', '),
       avaliacoes: g.n,
@@ -2618,7 +2637,11 @@ function renderCruzamento(){
   const todos = calcularCruzamento();
   document.getElementById('pl-cruzados').textContent = todos.filter(l=>l.naPlanilha).length;
 
-  if(!todos.length){ card.style.display = 'none'; return; }
+  if(!todos.length){
+    card.style.display = 'none';
+    document.getElementById('pl-grafico-card').style.display = 'none';
+    return;
+  }
   card.style.display = 'block';
 
   const tipo = document.getElementById('pl-filtro-tipo').value;
@@ -2644,6 +2667,7 @@ function renderCruzamento(){
     const dif = l.diferenca===null ? '–' : ((l.diferenca>0?'+':'')+l.diferenca.toFixed(1)+' p.p.');
     return `<tr>
       <td>${escapeHtml(l.lote)}</td>
+      <td>${l.plantio ? fmtData(l.plantio) : '–'}</td>
       <td>${escapeHtml(l.unidade)}</td>
       <td>${escapeHtml(l.clone)}</td>
       <td>${l.avaliacoes}</td>
@@ -2658,6 +2682,49 @@ function renderCruzamento(){
   }).join('');
 
   renderPaginacao('pag-cruz', lista.length, paginaCruz, 'irParaPaginaCruz');
+  renderGraficoCruzamento(lista);
+}
+
+// Compara, lote a lote, o enraizamento medido nas avaliações com o da
+// planilha. A ordem no eixo X é a mesma da tabela: plantio mais antigo à
+// esquerda, mais recente à direita.
+function renderGraficoCruzamento(lista){
+  const card = document.getElementById('pl-grafico-card');
+  const comAmbos = lista.filter(l=> l.enrApp!==null && l.enrPlan!==null);
+  card.style.display = 'block';
+
+  chartCruzamento = desenharGrafico(chartCruzamento, 'chart-cruzamento', 'pl-grafico-empty', {
+    type:'line',
+    data:{
+      labels: comAmbos.map(l=>l.lote),
+      datasets:[
+        {label:'Enraizamento — avaliação (%)', data: comAmbos.map(l=>l.enrApp), borderColor:'#009146', backgroundColor:'rgba(118,184,70,.20)', fill:false, tension:.25, spanGaps:true, pointRadius:3},
+        {label:'ENR % — planilha', data: comAmbos.map(l=>l.enrPlan), borderColor:'#BA7517', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:3, borderDash:[5,3]},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        y:{ min:0, max:100, ticks:{ callback:v=>v+'%' } },
+        x:{ title:{ display:true, text:'Lote (plantio mais antigo → mais recente)' } }
+      },
+      plugins:{
+        legend:{ position:'bottom' },
+        tooltip:{ callbacks:{
+          title: (itens)=>{
+            const l = comAmbos[itens[0].dataIndex];
+            return l && l.plantio ? ('Lote '+l.lote+' — plantio '+fmtData(l.plantio)) : ('Lote '+(l?l.lote:''));
+          },
+          label: ctx=> ctx.dataset.label+': '+(ctx.parsed.y===null?'–':ctx.parsed.y.toFixed(1)+'%'),
+          afterBody: (itens)=>{
+            const l = comAmbos[itens[0].dataIndex];
+            if(!l || l.diferenca===null) return '';
+            return 'Diferença: '+(l.diferenca>0?'+':'')+l.diferenca.toFixed(1)+' p.p.';
+          }
+        } }
+      }
+    }
+  }, comAmbos.length>0);
 }
 
 function irParaPaginaCruz(n){
@@ -2669,6 +2736,7 @@ function exportarCruzamento(){
   if(!cruzamentoAtual.length){ alert('Não há dados para exportar.'); return; }
   const linhas = cruzamentoAtual.map(l=>({
     'Lote': l.lote,
+    'Data de plantio': l.plantio ? fmtData(l.plantio) : '',
     'Unidade': l.unidade,
     'Clone': l.clone,
     'Avaliações no app': l.avaliacoes,
