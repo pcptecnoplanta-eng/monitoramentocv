@@ -465,9 +465,17 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     </div>
 
     <div class="card">
-      <div class="ct">Enraizamento e sobrevivência por lote</div>
+      <div class="ltb">
+        <div class="ct" style="margin-bottom:0;">Enraizamento e sobrevivência por lote</div>
+        <label class="chk-label" style="margin-top:0;">
+          <input type="checkbox" id="ck-clima-lote" onchange="onToggleClimaLote()">
+          <span class="box"></span>
+          Mostrar clima da unidade (no dia de plantio do lote)
+        </label>
+      </div>
       <div class="ms" style="margin-bottom:.5rem;">Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente).</div>
       <div class="chart-wrap"><canvas id="chart-lote"></canvas></div>
+      <div class="ms" id="clima-status-lote" style="margin-top:.5rem;"></div>
       <div class="empty" id="empty-chart-lote" style="display:none;">Nenhum dado para o período/filtro selecionado.</div>
     </div>
 
@@ -677,6 +685,10 @@ let climaRangeCarregado = null;
 // milhares de km de distância, então não faz sentido mostrar um clima
 // "médio". Se nenhuma unidade estiver selecionada, devolve null e o
 // gráfico avisa para escolher uma.
+function getUnidadeClima(){
+  return document.getElementById('fi-unidade').value || 'nenhuma';
+}
+
 function getCoordenadasClima(){
   const unidade = document.getElementById('fi-unidade').value;
   if(!unidade) return null;
@@ -722,14 +734,35 @@ async function buscarClima(dataInicio, dataFim){
   }
 }
 
-function onToggleClima(){
-  const ligado = document.getElementById('ck-clima').checked;
-  if(!ligado){
+// O clima é compartilhado pelos dois gráficos (plantio e lote): os dois
+// usam as mesmas datas de plantio, então uma única busca serve para ambos.
+function climaAtivo(){
+  const a = document.getElementById('ck-clima');
+  const b = document.getElementById('ck-clima-lote');
+  return (a && a.checked) || (b && b.checked);
+}
+
+function limparClimaSeDesligado(){
+  if(!climaAtivo()){
     climaDados = null;
     climaRangeCarregado = null;
     document.getElementById('clima-status').textContent = '';
+    document.getElementById('clima-status-lote').textContent = '';
   }
-  renderGraficosExtras(getFiltrados());
+}
+
+function onToggleClima(){
+  limparClimaSeDesligado();
+  const filtrados = getFiltrados();
+  renderGraficosExtras(filtrados);
+  renderGraficoLote(filtrados);
+}
+
+function onToggleClimaLote(){
+  limparClimaSeDesligado();
+  const filtrados = getFiltrados();
+  renderGraficosExtras(filtrados);
+  renderGraficoLote(filtrados);
 }
 
 function avisoErroSupabase(acao, error){
@@ -1918,49 +1951,8 @@ function renderDashboard(){
     });
   }
 
-  // agrupar por lote (soma ponderada por lote), ordenado pela data de
-  // plantio mais antiga de cada lote (do mais antigo à esquerda ao mais
-  // novo à direita)
-  const porLote = {};
-  filtrados.forEach(r=>{
-    if(!r.lote) return;
-    if(!porLote[r.lote]) porLote[r.lote] = {plant:0, mort:0, enr:0, plantioMin: r.plantio||null};
-    const g = porLote[r.lote];
-    g.plant += r.plantadas;
-    g.mort += r.mortas;
-    g.enr += r.enraizadas;
-    if(r.plantio && (!g.plantioMin || r.plantio < g.plantioMin)) g.plantioMin = r.plantio;
-  });
-  const lotes = Object.keys(porLote).sort((a,b)=>{
-    const da = porLote[a].plantioMin || '9999-99-99';
-    const db = porLote[b].plantioMin || '9999-99-99';
-    return da.localeCompare(db);
-  });
-  const serieEnrLote = lotes.map(l=> porLote[l].plant ? (porLote[l].enr/porLote[l].plant)*100 : null);
-  const serieSobLote = lotes.map(l=> porLote[l].plant ? ((porLote[l].plant-porLote[l].mort)/porLote[l].plant)*100 : null);
+  renderGraficoLote(filtrados);
 
-  document.getElementById('empty-chart-lote').style.display = lotes.length ? 'none' : 'block';
-  const canvasLote = document.getElementById('chart-lote');
-  canvasLote.style.display = lotes.length ? 'block' : 'none';
-
-  if(chartLote) chartLote.destroy();
-  if(lotes.length){
-    chartLote = new Chart(canvasLote, {
-      type:'line',
-      data:{
-        labels: lotes,
-        datasets:[
-          {label:'Enraizamento (%)', data: serieEnrLote, borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3},
-          {label:'Sobrevivência (%)', data: serieSobLote, borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3},
-        ]
-      },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        scales:{ y:{ min:0, max:100, ticks:{ callback:v=>v+'%' } }, x:{ title:{ display:true, text:'Lote (plantio mais antigo → mais recente)' } } },
-        plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label: ctx=> ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%' } } }
-      }
-    });
-  }
 
   renderGraficosExtras(filtrados);
 
@@ -1985,6 +1977,83 @@ function renderDashboard(){
   document.getElementById('tabela-dash').style.display = filtrados.length ? 'table' : 'none';
 
   renderRanking();
+}
+
+// ── GRÁFICO POR LOTE ──────────────────────────────────
+// Cada lote é posicionado pela sua data de plantio mais antiga, e é essa
+// data que também define o clima mostrado para aquele lote.
+function renderGraficoLote(filtrados){
+  const porLote = {};
+  filtrados.forEach(r=>{
+    if(!r.lote) return;
+    if(!porLote[r.lote]) porLote[r.lote] = {plant:0, mort:0, enr:0, plantioMin: r.plantio||null};
+    const g = porLote[r.lote];
+    g.plant += r.plantadas;
+    g.mort += r.mortas;
+    g.enr += r.enraizadas;
+    if(r.plantio && (!g.plantioMin || r.plantio < g.plantioMin)) g.plantioMin = r.plantio;
+  });
+  const lotes = Object.keys(porLote).sort((a,b)=>{
+    const da = porLote[a].plantioMin || '9999-99-99';
+    const db = porLote[b].plantioMin || '9999-99-99';
+    return da.localeCompare(db);
+  });
+
+  const climaLigado = document.getElementById('ck-clima-lote').checked;
+  const datasetsLote = [
+    {label:'Enraizamento (%)', data: lotes.map(l=>taxaEnr(porLote[l])), borderColor:'#009146', backgroundColor:'rgba(118,184,70,.28)', fill:'origin', tension:.25, spanGaps:true, pointRadius:3, yAxisID:'y'},
+    {label:'Sobrevivência (%)', data: lotes.map(l=>taxaSob(porLote[l])), borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,.22)', fill:0, tension:.25, spanGaps:true, pointRadius:3, yAxisID:'y'},
+  ];
+  const escalasLote = {
+    y:{ min:0, max:100, position:'left', ticks:{ callback:v=>v+'%' } },
+    x:{ title:{ display:true, text:'Lote (plantio mais antigo → mais recente)' } }
+  };
+
+  if(climaLigado && climaDados && lotes.length){
+    const climaDoLote = (l, campo)=>{
+      const dia = porLote[l].plantioMin;
+      return (dia && climaDados.datas[dia]) ? climaDados.datas[dia][campo] : null;
+    };
+    datasetsLote.push(
+      {type:'bar', label:'Chuva (mm)', data: lotes.map(l=>climaDoLote(l,'chuva')), backgroundColor:'rgba(24,95,165,.35)', borderColor:'rgba(24,95,165,.6)', borderWidth:1, yAxisID:'yChuva', order:9},
+      {label:'Temp. máx (°C)', data: lotes.map(l=>climaDoLote(l,'tmax')), borderColor:'#A32D2D', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:2, borderDash:[5,3], yAxisID:'yTemp'},
+      {label:'Temp. mín (°C)', data: lotes.map(l=>climaDoLote(l,'tmin')), borderColor:'#BA7517', backgroundColor:'transparent', fill:false, tension:.25, spanGaps:true, pointRadius:2, borderDash:[5,3], yAxisID:'yTemp'}
+    );
+    escalasLote.yTemp = { position:'right', title:{display:true, text:'°C'}, grid:{drawOnChartArea:false} };
+    escalasLote.yChuva = { position:'right', title:{display:true, text:'mm'}, grid:{drawOnChartArea:false}, beginAtZero:true };
+  }
+
+  chartLote = desenharGrafico(chartLote, 'chart-lote', 'empty-chart-lote', {
+    type:'line',
+    data:{ labels: lotes, datasets: datasetsLote },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales: escalasLote,
+      plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{
+        title: (itens)=>{
+          const l = itens[0]?.label;
+          const dia = l && porLote[l] ? porLote[l].plantioMin : null;
+          return dia ? ('Lote '+l+' — plantio '+fmtData(dia)) : ('Lote '+l);
+        },
+        label: ctx=>{
+          const v = ctx.parsed.y;
+          if(v===null || v===undefined) return ctx.dataset.label+': –';
+          const sufixo = ctx.dataset.label.includes('%') ? '%' : (ctx.dataset.label.includes('°C') ? ' °C' : (ctx.dataset.label.includes('mm') ? ' mm' : ''));
+          return ctx.dataset.label.replace(/ \(.*\)/,'')+': '+v.toFixed(1)+sufixo;
+        }
+      } } }
+    }
+  }, lotes.length>0);
+
+  const statusLote = document.getElementById('clima-status-lote');
+  if(climaLigado){
+    if(!getCoordenadasClima()) statusLote.textContent = 'Selecione uma unidade no filtro para ver o clima (cada unidade tem sua própria localização).';
+    else if(climaDados && climaDados.erro) statusLote.textContent = climaDados.erro;
+    else if(!climaDados) statusLote.textContent = 'Carregando dados de clima...';
+    else statusLote.textContent = '';
+  } else {
+    statusLote.textContent = '';
+  }
 }
 
 // ── GRÁFICOS EXTRAS ──────────────────────────────────
@@ -2100,17 +2169,19 @@ function renderGraficosExtras(filtrados){
   }, plantios.length>0);
 
   // Busca o clima e redesenha quando chegar. A chave inclui a unidade,
-  // pois cada unidade tem coordenadas próprias.
+  // pois cada unidade tem coordenadas próprias. Uma única busca alimenta
+  // tanto este gráfico quanto o de lotes.
   const statusClima = document.getElementById('clima-status');
-  const unidadeClima = document.getElementById('fi-unidade').value || 'nenhuma';
+  const unidadeClima = getUnidadeClima();
   const rangeClima = plantios.length ? (unidadeClima+'|'+plantios[0]+'|'+plantios[plantios.length-1]) : null;
-  if(climaLigado && rangeClima && climaRangeCarregado !== rangeClima){
+  if(climaAtivo() && rangeClima && climaRangeCarregado !== rangeClima){
     climaRangeCarregado = rangeClima;
-    statusClima.textContent = 'Carregando dados de clima...';
+    if(climaLigado) statusClima.textContent = 'Carregando dados de clima...';
     buscarClima(plantios[0], plantios[plantios.length-1]).then(res=>{
       climaDados = res;
-      statusClima.textContent = res.erro || '';
+      statusClima.textContent = (climaLigado && res.erro) ? res.erro : '';
       renderGraficosExtras(filtrados);
+      renderGraficoLote(filtrados);
     });
   } else if(climaLigado){
     statusClima.textContent = (climaDados && climaDados.erro) ? climaDados.erro : '';
