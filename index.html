@@ -305,12 +305,25 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   <div class="auth-box" id="auth-forgot-box" style="display:none;">
     <img src="logo.png" alt="Tecnoplanta" class="auth-logo-img">
     <div class="auth-title">Redefinir senha</div>
-    <div class="auth-sub">Como o acesso é feito localmente neste dispositivo, a redefinição precisa ser feita por um administrador.</div>
+    <div class="auth-sub">Informe seu email e enviaremos um link para você criar uma nova senha.</div>
     <div class="auth-error" id="forgot-error"></div>
     <div class="auth-success" id="forgot-success"></div>
-    <div class="auth-field"><label>Email</label><input type="email" id="forgot-email" placeholder="seu@email.com"></div>
-    <button class="auth-btn primary" onclick="doForgotPassword()">Solicitar redefinição</button>
+    <div class="auth-field"><label>Email</label><input type="email" id="forgot-email" placeholder="seu@email.com" autocomplete="username"></div>
+    <button class="auth-btn primary" onclick="doForgotPassword()">Enviar link de redefinição</button>
     <button class="auth-btn ghost" onclick="showAuthPanel('login')">← Voltar ao login</button>
+  </div>
+
+  <!-- NOVA SENHA (aberta pelo link recebido por email) -->
+  <div class="auth-box" id="auth-nova-senha-box" style="display:none;">
+    <img src="logo.png" alt="Tecnoplanta" class="auth-logo-img">
+    <div class="auth-title">Criar nova senha</div>
+    <div class="auth-sub">Escolha uma nova senha para a sua conta.</div>
+    <div class="auth-error" id="nova-senha-error"></div>
+    <form onsubmit="event.preventDefault();doDefinirNovaSenha()">
+      <div class="auth-field"><label>Nova senha</label><input type="password" id="nova-senha" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+      <div class="auth-field"><label>Confirmar nova senha</label><input type="password" id="nova-senha2" placeholder="Repita a senha" autocomplete="new-password"></div>
+      <button type="submit" class="auth-btn primary">Salvar nova senha</button>
+    </form>
   </div>
 </div>
 
@@ -1094,107 +1107,71 @@ async function registrarEvento(tipo, detalhe, emailUsuario){
   }catch(e){ console.warn('Falha ao registrar auditoria:', e); }
 }
 
-// As ações administrativas são autorizadas pelo token de sessão (o mesmo
-// que mantém o login), validado no banco a cada chamada — ele confere que
-// a sessão existe, não expirou e pertence a um admin aprovado. Por isso
-// não é preciso digitar a senha de novo depois de atualizar a página.
-function tokenSessao(){
-  return localStorage.getItem(SESSION_KEY) || '';
-}
-
-async function carregarUsuarios(){
-  if(!usuarioAtual || usuarioAtual.permissao!=='admin') return;
-  const {data, error} = await sb.rpc('listar_usuarios_sessao', {p_token: tokenSessao()});
-  if(error){ avisoErroSupabase('carregar usuários', error); return; }
-  usuarios = data || [];
-}
-
-// ── AUTENTICAÇÃO E PERMISSÕES ──────────────────────────────────
-const SESSION_KEY = 'enraizamento_sessao_v1';
+// ══════════════ AUTENTICAÇÃO (Supabase Auth) ══════════════
+// As contas e senhas ficam no Supabase Auth — o app nunca vê a senha nem
+// guarda hash algum. A sessão (JWT) é mantida pela própria biblioteca no
+// navegador, e é ela que as políticas do banco usam para decidir o que
+// cada pessoa pode ler ou gravar.
 const ADMIN_EMAIL = 'gustavo.zelmikaitis@tecnoplanta.com.br';
 const NOMES_PERMISSAO = {admin:'Administrador', editor:'Editor', visualizador:'Visualizador'};
 
-// Limite simples de tentativas de login neste navegador (mitigação básica
-// no cliente). Isso NÃO substitui um rate limit de verdade no servidor —
-// alguém chamando a API diretamente (fora do app) não é freado por isso.
-const LOGIN_MAX_TENTATIVAS = 5;
-const LOGIN_BLOQUEIO_MS = 30000;
-
 let usuarios = [];
-let usuarioAtual = null;
+let usuarioAtual = null;   // {id, email, nome, permissao, status, permissao_solicitada}
 
 function normalizarEmail(e){ return (e||'').trim().toLowerCase(); }
+
+async function carregarUsuarios(){
+  if(!usuarioAtual || usuarioAtual.permissao!=='admin') return;
+  const {data, error} = await sb.from('perfis').select('*').order('nome');
+  if(error){ avisoErroSupabase('carregar usuários', error); return; }
+  usuarios = data || [];
+}
 
 function showAuthPanel(qual){
   document.getElementById('auth-login-box').style.display = qual==='login' ? 'block' : 'none';
   document.getElementById('auth-register-box').style.display = qual==='register' ? 'block' : 'none';
   document.getElementById('auth-forgot-box').style.display = qual==='forgot' ? 'block' : 'none';
-  ['login-error','register-error','register-success','forgot-error','forgot-success'].forEach(id=>{
+  const nova = document.getElementById('auth-nova-senha-box');
+  if(nova) nova.style.display = qual==='nova-senha' ? 'block' : 'none';
+  ['login-error','register-error','register-success','forgot-error','forgot-success','nova-senha-error'].forEach(id=>{
     const el = document.getElementById(id);
     if(el){ el.style.display='none'; el.textContent=''; }
   });
 }
 
-function loginBloqueadoAte(){
-  return parseInt(sessionStorage.getItem('login_bloqueado_ate')||'0', 10);
+function mostrarErro(id, mensagem){
+  const el = document.getElementById(id);
+  el.textContent = mensagem;
+  el.style.display = 'block';
 }
-function registrarTentativaFalha(){
-  const n = parseInt(sessionStorage.getItem('login_tentativas')||'0', 10) + 1;
-  sessionStorage.setItem('login_tentativas', String(n));
-  if(n >= LOGIN_MAX_TENTATIVAS){
-    sessionStorage.setItem('login_bloqueado_ate', String(Date.now() + LOGIN_BLOQUEIO_MS));
-    sessionStorage.setItem('login_tentativas', '0');
-  }
-}
-function limparTentativasLogin(){
-  sessionStorage.removeItem('login_tentativas');
-  sessionStorage.removeItem('login_bloqueado_ate');
+
+// Traduz as mensagens que o Supabase devolve em inglês.
+function traduzErroAuth(msg){
+  const m = String(msg||'').toLowerCase();
+  if(m.includes('invalid login credentials')) return 'Email ou senha incorretos.';
+  if(m.includes('email not confirmed')) return 'Confirme seu email pelo link que enviamos antes de entrar.';
+  if(m.includes('user already registered') || m.includes('already been registered')) return 'Já existe uma conta com este email.';
+  if(m.includes('password should be at least')) return 'A senha deve ter no mínimo 6 caracteres.';
+  if(m.includes('rate limit') || m.includes('too many')) return 'Muitas tentativas seguidas. Aguarde um instante e tente de novo.';
+  if(m.includes('unable to validate email')) return 'Email inválido.';
+  return msg || 'Não foi possível concluir.';
 }
 
 async function doLogin(){
-  const errBox = document.getElementById('login-error');
-  errBox.style.display = 'none';
-
-  const bloqueadoAte = loginBloqueadoAte();
-  if(bloqueadoAte > Date.now()){
-    const segundos = Math.ceil((bloqueadoAte - Date.now())/1000);
-    errBox.textContent = 'Muitas tentativas incorretas. Tente novamente em '+segundos+' segundos.';
-    errBox.style.display = 'block';
-    return;
-  }
-
   const email = normalizarEmail(document.getElementById('login-email').value);
   const senha = document.getElementById('login-senha').value;
-  if(!email || !senha){
-    errBox.textContent = 'Informe email e senha.';
-    errBox.style.display = 'block';
-    return;
-  }
+  if(!email || !senha){ mostrarErro('login-error','Informe email e senha.'); return; }
 
   const btn = document.querySelector('#auth-login-box button[type="submit"]');
   btn.disabled = true;
   try{
-    const {data, error} = await sb.rpc('autenticar_usuario', {p_email: email, p_senha: senha});
-    if(error){ avisoErroSupabase('fazer login', error); return; }
-
-    const usuario = Array.isArray(data) ? data[0] : data;
-    if(!usuario){
-      registrarTentativaFalha();
-      registrarEvento('login_falha', 'credenciais inválidas', email);
-      errBox.textContent = 'Email ou senha incorretos.';
-      errBox.style.display = 'block';
+    const {error} = await sb.auth.signInWithPassword({email, password: senha});
+    if(error){
+      registrarEvento('login_falha', null, email);
+      mostrarErro('login-error', traduzErroAuth(error.message));
       return;
     }
-
-    limparTentativasLogin();
-    if(usuario.status === 'pendente'){
-      registrarEvento('login_pendente', null, email);
-      mostrarTelaPendente();
-      return;
-    }
-    if(usuario.token) localStorage.setItem(SESSION_KEY, usuario.token);
-    registrarEvento('login_sucesso', null, email);
-    iniciarSessao(usuario);
+    // O restante do fluxo corre em onAuthStateChange.
   } finally {
     btn.disabled = false;
   }
@@ -1206,85 +1183,83 @@ async function doRegister(){
   const senha = document.getElementById('reg-senha').value;
   const senha2 = document.getElementById('reg-senha2').value;
   const permissaoSolicitada = document.getElementById('reg-permissao').value;
-  const errBox = document.getElementById('register-error');
-  const okBox = document.getElementById('register-success');
-  errBox.style.display = 'none';
-  okBox.style.display = 'none';
 
-  if(!nome || !email || !senha || !senha2){
-    errBox.textContent = 'Preencha todos os campos.';
-    errBox.style.display = 'block';
-    return;
-  }
-  if(senha.length < 6){
-    errBox.textContent = 'A senha deve ter no mínimo 6 caracteres.';
-    errBox.style.display = 'block';
-    return;
-  }
-  if(senha !== senha2){
-    errBox.textContent = 'As senhas não coincidem.';
-    errBox.style.display = 'block';
-    return;
-  }
+  if(!nome || !email || !senha || !senha2){ mostrarErro('register-error','Preencha todos os campos.'); return; }
+  if(senha.length < 6){ mostrarErro('register-error','A senha deve ter no mínimo 6 caracteres.'); return; }
+  if(senha !== senha2){ mostrarErro('register-error','As senhas não coincidem.'); return; }
 
   const btn = document.querySelector('#auth-register-box button[type="submit"]');
   btn.disabled = true;
   try{
-    const {data, error} = await sb.rpc('registrar_usuario', {
-      p_nome: nome, p_email: email, p_senha: senha, p_permissao: permissaoSolicitada
+    const {data, error} = await sb.auth.signUp({
+      email, password: senha,
+      options: {data: {nome, permissao_solicitada: permissaoSolicitada}}
     });
-    if(error){
-      if(String(error.message||'').includes('email_ja_cadastrado')){
-        errBox.textContent = 'Já existe uma conta com este email.';
-      } else {
-        avisoErroSupabase('criar conta', error);
-        errBox.textContent = 'Não foi possível criar a conta.';
-      }
-      errBox.style.display = 'block';
-      return;
-    }
+    if(error){ mostrarErro('register-error', traduzErroAuth(error.message)); return; }
 
-    const novo = Array.isArray(data) ? data[0] : data;
-    registrarEvento('conta_criada', novo.permissao+(novo.permissao_solicitada?' (pediu '+novo.permissao_solicitada+')':''), email);
-
-    if(novo.status === 'aprovado'){
-      if(novo.token) localStorage.setItem(SESSION_KEY, novo.token);
-      if(novo.permissao_solicitada){
-        // Mostra o aviso rapidinho antes de entrar, já que a tela vai trocar.
-        alert('Conta criada! Você já pode acessar como Visualizador. Sua solicitação de acesso como Editor ficará aguardando aprovação de um administrador.');
-      }
-      iniciarSessao(novo);
-      return;
-    }
-
-    okBox.textContent = 'Conta criada! Aguarde a aprovação de um administrador para acessar.';
-    okBox.style.display = 'block';
+    registrarEvento('conta_criada', permissaoSolicitada, email);
     document.getElementById('reg-nome').value = '';
     document.getElementById('reg-email').value = '';
     document.getElementById('reg-senha').value = '';
     document.getElementById('reg-senha2').value = '';
+
+    // Sem sessão = a instância exige confirmação de email.
+    if(!data.session){
+      const ok = document.getElementById('register-success');
+      ok.textContent = 'Conta criada! Confirme seu email pelo link que enviamos e depois faça login.';
+      ok.style.display = 'block';
+      return;
+    }
+    // Com sessão, o onAuthStateChange assume daqui.
   } finally {
     btn.disabled = false;
   }
 }
 
-function doForgotPassword(){
+// Agora a redefinição é de verdade: o Supabase envia o email com o link.
+async function doForgotPassword(){
   const email = normalizarEmail(document.getElementById('forgot-email').value);
-  const errBox = document.getElementById('forgot-error');
-  const okBox = document.getElementById('forgot-success');
-  errBox.style.display = 'none';
-  okBox.style.display = 'none';
-  if(!email){
-    errBox.textContent = 'Informe seu email.';
-    errBox.style.display = 'block';
-    return;
-  }
-  okBox.textContent = 'Solicitação registrada. Peça a um administrador para redefinir sua senha em Configurações.';
-  okBox.style.display = 'block';
+  if(!email){ mostrarErro('forgot-error','Informe seu email.'); return; }
+  const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: window.location.origin + window.location.pathname});
+  if(error){ mostrarErro('forgot-error', traduzErroAuth(error.message)); return; }
+  const ok = document.getElementById('forgot-success');
+  ok.textContent = 'Se existir uma conta com este email, enviamos um link para redefinir a senha.';
+  ok.style.display = 'block';
 }
 
-async function iniciarSessao(user){
-  usuarioAtual = user;
+// Tela que aparece quando a pessoa volta pelo link do email.
+async function doDefinirNovaSenha(){
+  const s1 = document.getElementById('nova-senha').value;
+  const s2 = document.getElementById('nova-senha2').value;
+  if(!s1 || s1.length < 6){ mostrarErro('nova-senha-error','A senha deve ter no mínimo 6 caracteres.'); return; }
+  if(s1 !== s2){ mostrarErro('nova-senha-error','As senhas não coincidem.'); return; }
+  const {error} = await sb.auth.updateUser({password: s1});
+  if(error){ mostrarErro('nova-senha-error', traduzErroAuth(error.message)); return; }
+  registrarEvento('senha_redefinida', null, usuarioAtual? usuarioAtual.email : null);
+  alert('Senha atualizada.');
+  entrarNoApp();
+}
+
+// Busca o perfil (permissão/status) da conta autenticada.
+async function carregarPerfil(){
+  const {data: sessao} = await sb.auth.getSession();
+  if(!sessao || !sessao.session){ usuarioAtual = null; return null; }
+  const {data, error} = await sb.from('perfis').select('*').eq('id', sessao.session.user.id).maybeSingle();
+  if(error){ console.warn('Falha ao ler perfil:', error); return null; }
+  usuarioAtual = data || null;
+  return usuarioAtual;
+}
+
+async function entrarNoApp(){
+  const perfil = await carregarPerfil();
+  if(!perfil){
+    // A conta existe no Auth, mas o perfil ainda não apareceu (replicação
+    // logo após o cadastro). Tenta de novo em instantes.
+    setTimeout(()=>{ carregarPerfil().then(p=> p ? entrarNoApp() : doLogout()); }, 1200);
+    return;
+  }
+  if(perfil.status !== 'aprovado'){ mostrarTelaPendente(); return; }
+
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('auth-pending-screen').style.display = 'none';
   document.getElementById('app-content').style.display = 'block';
@@ -1295,7 +1270,7 @@ async function iniciarSessao(user){
     carregarPlanilha(),
     carregarDefensivos(),
     carregarPessoasAtivas(),
-    user.permissao==='admin' ? carregarUsuarios() : Promise.resolve()
+    perfil.permissao==='admin' ? carregarUsuarios() : Promise.resolve()
   ]);
 
   aplicarPermissoes();
@@ -1308,19 +1283,18 @@ function mostrarTelaPendente(){
   document.getElementById('auth-pending-screen').style.display = 'flex';
 }
 
-async function doLogout(){
-  if(usuarioAtual) registrarEvento('logout', null, usuarioAtual.email);
-  const token = localStorage.getItem(SESSION_KEY);
-  if(token){
-    try{ await sb.rpc('encerrar_sessao', {p_token: token}); }
-    catch(e){ console.warn('Falha ao encerrar sessão no servidor:', e); }
-  }
-  usuarioAtual = null;
-  localStorage.removeItem(SESSION_KEY);
+function mostrarTelaLogin(){
   document.getElementById('app-content').style.display = 'none';
   document.getElementById('auth-pending-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
   showAuthPanel('login');
+}
+
+async function doLogout(){
+  if(usuarioAtual) registrarEvento('logout', null, usuarioAtual.email);
+  usuarioAtual = null;
+  try{ await sb.auth.signOut(); }catch(e){ console.warn('Falha ao sair:', e); }
+  mostrarTelaLogin();
   document.getElementById('login-email').value = '';
   document.getElementById('login-senha').value = '';
 }
@@ -1338,10 +1312,10 @@ function aplicarPermissoes(){
   btnPlan.style.display = (p==='admin' || p==='editor') ? '' : 'none';
   btnDef.style.display = '';
   btnPes.style.display = '';
-  // Só admin configura a origem dos dados da equipe.
+  btnCfg.style.display = (p==='admin') ? '' : 'none';
+
   const cardCfgPessoas = document.getElementById('pa-config-card');
   if(cardCfgPessoas) cardCfgPessoas.style.display = (p==='admin') ? 'block' : 'none';
-  btnCfg.style.display = (p==='admin') ? '' : 'none';
 
   document.getElementById('hd-user-name').textContent = usuarioAtual.nome || usuarioAtual.email;
   document.getElementById('hd-user-role').textContent = NOMES_PERMISSAO[p] || p;
@@ -1353,10 +1327,8 @@ function aplicarPermissoes(){
 }
 
 // ── ADMIN: APROVAÇÕES E GESTÃO DE USUÁRIOS ──────────────────────────────
-// Todas as ações abaixo reenviam o email+senha do admin logado para o
-// banco, que confere a senha (com bcrypt) antes de executar qualquer
-// alteração — mesmo que alguém tente chamar essas funções diretamente
-// pela API, sem uma senha de admin válida a ação é recusada.
+// As alterações são feitas direto na tabela "perfis"; quem garante que só
+// um admin consegue é a política de RLS no banco, não a interface.
 function renderAprovacoes(){
   const cont = document.getElementById('cfg-aprovacoes-tbody');
   if(!cont) return;
@@ -1373,23 +1345,29 @@ function renderAprovacoes(){
   document.getElementById('cfg-aprovacoes-tabela').style.display = pendentes.length ? 'table' : 'none';
 }
 
-async function aprovarUsuario(email){
-  const {error} = await sb.rpc('aprovar_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email});
-  if(error){ avisoErroSupabase('aprovar usuário', error); return; }
-  registrarEvento('usuario_aprovado', email, usuarioAtual.email);
+async function atualizarPerfil(email, campos, evento, detalhe){
+  const {error} = await sb.from('perfis').update(campos).eq('email', email);
+  if(error){ avisoErroSupabase('atualizar usuário', error); return false; }
+  registrarEvento(evento, detalhe || email, usuarioAtual.email);
   await carregarUsuarios();
   renderAprovacoes();
   renderSolicitacoesUpgrade();
   renderUsuarios();
+  return true;
+}
+
+async function aprovarUsuario(email){
+  await atualizarPerfil(email, {status:'aprovado'}, 'usuario_aprovado');
 }
 
 async function recusarUsuario(email){
   if(!confirm('Recusar e excluir esta solicitação de acesso?')) return;
-  const {error} = await sb.rpc('recusar_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email});
+  const {error} = await sb.from('perfis').delete().eq('email', email).eq('status','pendente');
   if(error){ avisoErroSupabase('recusar usuário', error); return; }
   registrarEvento('usuario_recusado', email, usuarioAtual.email);
   await carregarUsuarios();
   renderAprovacoes();
+  renderUsuarios();
 }
 
 function renderUsuarios(){
@@ -1431,44 +1409,30 @@ function renderSolicitacoesUpgrade(){
 }
 
 async function promoverUsuarioEditor(email){
-  const {error} = await sb.rpc('promover_usuario_editor_sessao', {p_token: tokenSessao(), p_alvo_email: email});
-  if(error){ avisoErroSupabase('promover usuário', error); return; }
-  registrarEvento('usuario_promovido_editor', email, usuarioAtual.email);
-  await carregarUsuarios();
-  renderSolicitacoesUpgrade();
-  renderUsuarios();
+  await atualizarPerfil(email, {permissao:'editor', permissao_solicitada:null}, 'usuario_promovido_editor');
 }
 
 async function recusarPromocaoUsuario(email){
   if(!confirm('Recusar o pedido de acesso como Editor? A pessoa continua como Visualizador.')) return;
-  const {error} = await sb.rpc('recusar_promocao_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email});
-  if(error){ avisoErroSupabase('recusar promoção', error); return; }
-  registrarEvento('promocao_recusada', email, usuarioAtual.email);
-  await carregarUsuarios();
-  renderSolicitacoesUpgrade();
-  renderUsuarios();
+  await atualizarPerfil(email, {permissao_solicitada:null}, 'promocao_recusada');
 }
 
 async function alterarPermissaoUsuario(email, novaPermissao){
   if(email === ADMIN_EMAIL) return;
-  const {error} = await sb.rpc('alterar_permissao_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email, p_nova_permissao: novaPermissao});
-  if(error){ avisoErroSupabase('alterar permissão', error); return; }
-  registrarEvento('permissao_alterada', email+' -> '+novaPermissao, usuarioAtual.email);
-  await carregarUsuarios();
-  renderSolicitacoesUpgrade();
-  renderUsuarios();
+  await atualizarPerfil(email, {permissao:novaPermissao, permissao_solicitada:null}, 'permissao_alterada', email+' -> '+novaPermissao);
 }
 
 async function removerUsuario(email){
   if(email === ADMIN_EMAIL){ alert('Não é possível remover o administrador principal.'); return; }
-  if(!confirm('Remover o acesso deste usuário?')) return;
-  const {error} = await sb.rpc('remover_usuario_sessao', {p_token: tokenSessao(), p_alvo_email: email});
+  if(!confirm('Remover o acesso deste usuário?\n\nEle perde o acesso ao app imediatamente. A conta de login continua existindo no Supabase e pode ser apagada por lá, se quiser.')) return;
+  const {error} = await sb.from('perfis').delete().eq('email', email);
   if(error){ avisoErroSupabase('remover usuário', error); return; }
   registrarEvento('usuario_removido', email, usuarioAtual.email);
   await carregarUsuarios();
   renderSolicitacoesUpgrade();
   renderUsuarios();
 }
+
 
 // ── CONFIG: CLONES POR UNIDADE ──────────────────────────────────
 function renderConfigClones(){
@@ -3793,32 +3757,40 @@ function renderTudo(){
   }
 }
 
-async function tentarSessaoSalva(){
-  const token = localStorage.getItem(SESSION_KEY);
-  if(!token){
-    document.getElementById('auth-screen').style.display = 'flex';
-    return;
-  }
-  const {data, error} = await sb.rpc('validar_sessao', {p_token: token});
-  const userSalvo = Array.isArray(data) ? data[0] : data;
-  if(error || !userSalvo){
-    localStorage.removeItem(SESSION_KEY);
-    document.getElementById('auth-screen').style.display = 'flex';
-    return;
-  }
-  if(userSalvo.status === 'aprovado'){
-    iniciarSessao(userSalvo);
-  } else if(userSalvo.status === 'pendente'){
-    mostrarTelaPendente();
-  } else {
-    document.getElementById('auth-screen').style.display = 'flex';
-  }
-}
+// A biblioteca do Supabase guarda e renova a sessão sozinha. Aqui só
+// reagimos: entrou → carrega o app; saiu → volta ao login; veio pelo link
+// de redefinição de senha → mostra a tela de nova senha.
+let recuperandoSenha = false;
 
-document.addEventListener('DOMContentLoaded', ()=>{
+sb.auth.onAuthStateChange((evento, sessao)=>{
+  if(evento === 'PASSWORD_RECOVERY'){
+    recuperandoSenha = true;
+    document.getElementById('app-content').style.display = 'none';
+    document.getElementById('auth-pending-screen').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+    showAuthPanel('nova-senha');
+    return;
+  }
+  if(recuperandoSenha && evento !== 'SIGNED_OUT') return; // espera definir a nova senha
+
+  if(evento === 'SIGNED_IN' || evento === 'INITIAL_SESSION'){
+    if(sessao) entrarNoApp();
+    else mostrarTelaLogin();
+  } else if(evento === 'SIGNED_OUT'){
+    recuperandoSenha = false;
+    usuarioAtual = null;
+    mostrarTelaLogin();
+  }
+});
+
+document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('f-data').value = hoje();
   atualizarOpcoesClone();
-  tentarSessaoSalva();
+  // Se o evento inicial não vier (ex.: aba restaurada), decide pela sessão.
+  const {data} = await sb.auth.getSession();
+  if(!data || !data.session){
+    if(!recuperandoSenha) mostrarTelaLogin();
+  }
 });
 </script>
 </body>
