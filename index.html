@@ -2981,9 +2981,10 @@ function renderCruzamento(){
   const card = document.getElementById('pl-cruz-card');
   const todos = calcularCruzamento();
 
+  // Só controla a tabela desta aba. O gráfico vive no Dashboard e é
+  // gerenciado por renderGraficoCruzamento().
   if(!todos.length){
     card.style.display = 'none';
-    document.getElementById('pl-grafico-card').style.display = 'none';
     return;
   }
   card.style.display = 'block';
@@ -3032,12 +3033,27 @@ function renderCruzamento(){
 // planilha de registro da unidade. Fica no Dashboard e usa os mesmos
 // filtros de lá. Ordem do eixo X: plantio mais antigo à esquerda.
 function renderGraficoCruzamento(){
+  const card = document.getElementById('pl-grafico-card');
+  if(card) card.style.display = 'block';
+
   const lista = calcularCruzamento();
   const comAmbos = lista.filter(l=> l.enrApp!==null && l.enrPlan!==null);
   const contador = document.getElementById('pl-grafico-count');
   if(contador) contador.textContent = comAmbos.length
     ? (comAmbos.length+' lote'+(comAmbos.length!==1?'s':'')+' comparado'+(comAmbos.length!==1?'s':''))
     : '';
+
+  // Mensagem de vazio explica QUAL é o motivo, que muda bastante o que
+  // fazer: sem planilha enviada, ou planilha sem os lotes avaliados.
+  const vazio = document.getElementById('pl-grafico-empty');
+  if(vazio && !comAmbos.length){
+    const temPlanilha = Object.keys(planilhaDados||{}).length > 0;
+    vazio.textContent = !lista.length
+      ? 'Nenhum lançamento no filtro atual para comparar.'
+      : (!temPlanilha
+          ? 'Nenhum Registro de Produção enviado ainda. Envie o arquivo da unidade na aba "Registro de Produção".'
+          : 'Os lotes avaliados no filtro atual não foram encontrados no Registro de Produção das unidades enviadas.');
+  }
 
   const climaLigado = document.getElementById('ck-clima-cruz').checked;
   const datasets = [
