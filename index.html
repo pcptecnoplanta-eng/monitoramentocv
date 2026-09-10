@@ -2227,16 +2227,29 @@ function renderGraficoPrincipal(filtrados){
 const APLIC_URL = 'https://awbyfboedszwczukxqzo.supabase.co';
 const APLIC_KEY = 'sb_publishable_d7sIlkDbmhStHgFAUALMLw_w8XPh5Ei';
 const APLIC_TABELA_KEY = 'defensivos_tabela_v1';
-const sbAplic = window.supabase.createClient(APLIC_URL, APLIC_KEY);
 
 let defensivosLinhas = [];
 let defensivosColunas = [];
 let defensivosTabelas = [];
 let paginaDef = 1;
 
-// Pergunta ao PostgREST quais tabelas existem no projeto. Chaves no
-// formato novo (sb_publishable_...) não são JWT, então vão só no header
-// "apikey" — mandá-las como Bearer faz o servidor responder 401.
+// Busca os registros por fetch direto (em vez do cliente) para conseguir
+// mostrar a mensagem exata que o servidor devolve quando algo dá errado —
+// "Invalid API key", "No API key found", RLS, nome de tabela errado, etc.
+async function buscarTabelaAplic(tabela){
+  const url = APLIC_URL+'/rest/v1/'+encodeURIComponent(tabela)+'?select=*&limit=5000';
+  const resp = await fetch(url, {
+    headers: {apikey: APLIC_KEY, Authorization: 'Bearer '+APLIC_KEY, Accept: 'application/json'}
+  });
+  const texto = await resp.text();
+  if(!resp.ok){
+    let detalhe = texto;
+    try{ const j = JSON.parse(texto); detalhe = j.message || j.hint || j.error || texto; }catch(e){}
+    throw new Error('HTTP '+resp.status+' — '+String(detalhe).slice(0,300));
+  }
+  try{ return JSON.parse(texto); }catch(e){ throw new Error('Resposta inesperada do servidor.'); }
+}
+
 async function listarTabelasAplic(){
   const resp = await fetch(APLIC_URL+'/rest/v1/', {headers:{apikey: APLIC_KEY}});
   if(!resp.ok) throw new Error('HTTP '+resp.status);
@@ -2269,10 +2282,11 @@ async function carregarDefensivos(forcar){
   const selTabela = document.getElementById('df-tabela');
   const manual = document.getElementById('df-tabela-manual');
 
-  // 1) Tenta descobrir as tabelas. Se o projeto não expõe essa listagem
-  //    (comum quando a introspecção está desativada), seguimos em frente:
-  //    basta o nome da tabela digitado no campo ao lado.
-  if(!defensivosTabelas.length || forcar){
+  // 1) Tenta descobrir as tabelas. Muitos projetos bloqueiam essa listagem
+  //    (o endpoint raiz responde 401), e tudo bem: se já sabemos o nome da
+  //    tabela, nem tentamos — assim não fica erro à toa no console.
+  const jaConhecida = (manual.value.trim() || localStorage.getItem(APLIC_TABELA_KEY) || '').trim();
+  if((!defensivosTabelas.length || forcar) && !jaConhecida){
     status.textContent = 'Conectando ao Controle de Aplicação...';
     try{
       defensivosTabelas = await listarTabelasAplic();
@@ -2283,10 +2297,13 @@ async function carregarDefensivos(forcar){
         selTabela.disabled = false;
       }
     }catch(e){
-      console.warn('Listagem de tabelas indisponível:', e);
+      console.warn('Listagem de tabelas indisponível neste projeto (normal):', e.message);
       selTabela.innerHTML = '<option value="">(listagem indisponível)</option>';
       selTabela.disabled = true;
     }
+  } else if(jaConhecida){
+    selTabela.innerHTML = '<option value="'+escapeHtml(jaConhecida)+'">'+escapeHtml(jaConhecida)+'</option>';
+    selTabela.disabled = true;
   }
 
   // 2) Define a tabela a consultar: o que estiver digitado tem prioridade.
@@ -2300,8 +2317,7 @@ async function carregarDefensivos(forcar){
 
   try{
     status.textContent = 'Carregando registros de "'+tabela+'"...';
-    const {data, error} = await sbAplic.from(tabela).select('*').limit(5000);
-    if(error) throw new Error(error.message);
+    const data = await buscarTabelaAplic(tabela);
 
     defensivosLinhas = data || [];
     defensivosColunas = defensivosLinhas.length ? Object.keys(defensivosLinhas[0]) : [];
