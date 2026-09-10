@@ -606,6 +606,11 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
         </div>
       </div>
       <div class="ms" style="margin-bottom:.75rem;">Considera os mesmos filtros da aba "Visão geral" (unidade, clone, período, faixa de idade etc). Ordenado pela taxa de enraizamento média (mudas enraizadas ÷ mudas plantadas), da melhor para a pior.</div>
+      <label class="chk-label" style="margin-top:0;margin-bottom:.75rem;">
+        <input type="checkbox" id="rk-so-ativas" onchange="paginaRanking=1;renderRanking()">
+        <span class="box"></span>
+        Mostrar apenas as colaboradoras ativas (aba "Pessoas ativas")
+      </label>
       <div class="tw">
         <table id="tabela-ranking">
           <thead><tr>
@@ -3638,11 +3643,20 @@ function calcularRanking(){
 }
 
 function renderRanking(){
-  rankingListaAtual = calcularRanking();
+  const soAtivas = document.getElementById('rk-so-ativas').checked;
+  const completa = calcularRanking();
+  // O filtro é aplicado antes de numerar as posições, então o ranking
+  // exibido fica 1º, 2º, 3º... entre as pessoas ativas.
+  rankingListaAtual = soAtivas
+    ? completa.filter(g=> colaboradoraEstaAtiva(g.colaboradoraNome, g.unidade, g.colaboradora))
+    : completa;
   const lista = rankingListaAtual;
 
   document.getElementById('ranking-count').textContent = lista.length+' colaboradora'+(lista.length!==1?'s':'');
   document.getElementById('empty-ranking').style.display = lista.length ? 'none' : 'block';
+  document.getElementById('empty-ranking').textContent = (soAtivas && completa.length)
+    ? 'Nenhuma colaboradora ativa entre as que têm lançamentos no filtro atual.'
+    : 'Nenhum lançamento com colaboradora identificada para o filtro selecionado.';
   document.getElementById('tabela-ranking').style.display = lista.length ? 'table' : 'none';
 
   const totalPaginasRanking = Math.max(1, Math.ceil(lista.length/ITENS_POR_PAGINA));
