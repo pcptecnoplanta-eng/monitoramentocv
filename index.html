@@ -61,15 +61,6 @@ nav{background:var(--sf);border-bottom:1px solid var(--brl);padding:0 1.5rem;dis
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
-@media(max-width:640px){
-  .g3,.g4{grid-template-columns:1fr 1fr;}
-  .g2{grid-template-columns:1fr;}
-  header{padding:.625rem 1rem;min-height:56px;}
-  header h1{font-size:11px;}
-  header p{display:none;}
-  .hstat strong{font-size:14px;}
-  .page{padding:1rem .875rem 4rem;}
-}
 .field{display:flex;flex-direction:column;gap:4px;}
 label{font-size:11px;color:var(--txm);font-weight:500;letter-spacing:.03em;text-transform:uppercase;}
 input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--br);border-radius:var(--r);font-family:var(--fn);font-size:13px;color:var(--tx);background:var(--sf);transition:border-color .15s;outline:none;-webkit-appearance:none;appearance:none;}
@@ -175,6 +166,86 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 .multisel-opt input:checked + .box{background:var(--gm);border-color:var(--gm);}
 .multisel-opt input:checked + .box::after{content:'';position:absolute;left:3px;top:0px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
 .multisel-empty{padding:8px;font-size:12px;color:var(--txm);text-align:center;}
+
+/* ═══════════ MOBILE ═══════════ */
+/* Tablets e telas médias */
+@media(max-width:900px){
+  .g4{grid-template-columns:1fr 1fr;}
+  .page{padding:1rem 1rem 4rem;}
+}
+
+/* Celulares */
+@media(max-width:640px){
+  /* No celular o cabeçalho pode quebrar em duas linhas, o que bagunçaria
+     um "nav" grudado numa altura fixa. Então só o nav fica fixo no topo. */
+  header{position:static;padding:.625rem .875rem;min-height:0;gap:.5rem;}
+  header h1{font-size:11px;}
+  header p{display:none;}
+  nav{top:0;padding:0 .5rem;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  nav::-webkit-scrollbar{display:none;}
+  .nt{padding:11px 13px;font-size:12.5px;white-space:nowrap;flex:0 0 auto;}
+
+  .hs{gap:10px;}
+  .hstat{display:none;}              /* contador cabe melhor no corpo da página */
+  .hs-user-name{font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .hs-user-role{font-size:8px;}
+
+  .page{padding:.875rem .75rem 4rem;}
+  .card{padding:.875rem;border-radius:10px;margin-bottom:.75rem;}
+  .ct{font-size:10.5px;margin-bottom:.75rem;}
+
+  /* Uma coluna por vez: campo largo é campo fácil de tocar. */
+  .g2,.g3,.g4{grid-template-columns:1fr;gap:8px;}
+  .metrics{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem;}
+  .metric{padding:.7rem .75rem;}
+  .mv{font-size:18px;}
+
+  /* 16px evita o zoom automático do iOS ao focar um campo. */
+  input,select,textarea{font-size:16px;padding:10px 12px;}
+  label{font-size:10.5px;}
+  .btn{padding:11px 16px;font-size:13px;}
+
+  /* Barras de título com ações: título em cima, ações embaixo. */
+  .ltb{flex-direction:column;align-items:stretch;gap:8px;}
+  .xb{flex-wrap:wrap;}
+  .filtro-rodape{flex-direction:column;align-items:stretch;gap:10px;}
+  .filtro-rodape .btn{margin-left:0 !important;width:100%;}
+  .filtro-rodape .field{max-width:none !important;}
+
+  .subnav{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .subnav::-webkit-scrollbar{display:none;}
+  .snt{white-space:nowrap;flex:0 0 auto;padding:9px 12px;}
+
+  /* Tabelas continuam roláveis na horizontal, com dica visual da barra. */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tw::-webkit-scrollbar{height:10px;}
+  table{font-size:11.5px;}
+  th{padding:6px 8px;font-size:9.5px;}
+  td{padding:6px 8px;}
+
+  .chart-wrap{height:280px;}
+  .rates{grid-template-columns:1fr;gap:8px;}
+  .rate-box .rv{font-size:22px;}
+
+  .pagination{gap:8px;}
+  .pagination .btn{flex:1;padding:9px 8px;}
+  .pagination .pag-info{font-size:11px;text-align:center;}
+
+  .auth-box{padding:1.5rem 1.25rem;border-radius:12px;}
+  .auth-title{font-size:18px;}
+  .inline-add{flex-direction:column;}
+  .inline-add .btn{width:100%;}
+  .stepper .btn{padding:0 16px;}
+}
+
+/* Celulares estreitos */
+@media(max-width:400px){
+  .metrics{grid-template-columns:1fr;}
+  .nt{padding:10px 10px;font-size:12px;}
+  .header-logo-img{height:34px;max-width:80px;}
+  .chart-wrap{height:240px;}
+}
+
 </style>
 </head>
 <body>
@@ -266,7 +337,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 <nav>
   <button class="nt active" data-page="page-lancamento" onclick="trocarAba('page-lancamento',this)">Lançamento</button>
   <button class="nt" data-page="page-dashboard" onclick="trocarAba('page-dashboard',this)">Dashboard</button>
-  <button class="nt" data-page="page-planilha" onclick="trocarAba('page-planilha',this)">Planilha</button>
+  <button class="nt" data-page="page-planilha" onclick="trocarAba('page-planilha',this)">Registro de Produção</button>
   <button class="nt" data-page="page-defensivos" onclick="trocarAba('page-defensivos',this)">Defensivos</button>
   <button class="nt" data-page="page-config" onclick="trocarAba('page-config',this)">Configurações</button>
 </nav>
@@ -481,10 +552,10 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       </div>
       <div class="ms" style="margin-bottom:.5rem;">
         Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente).
-        A planilha usada é a da unidade de cada lançamento (enviada na aba Planilha).
+        A planilha usada é a da unidade de cada lançamento (enviada na aba "Registro de Produção").
       </div>
       <div class="chart-wrap"><canvas id="chart-cruzamento"></canvas></div>
-      <div class="empty" id="pl-grafico-empty" style="display:none;">Nenhum lote com os dois valores para comparar. Envie a planilha de registro da unidade na aba "Planilha".</div>
+      <div class="empty" id="pl-grafico-empty" style="display:none;">Nenhum lote com os dois valores para comparar. Envie o Registro de Produção da unidade na aba "Registro de Produção".</div>
     </div>
 
     <div class="card">
@@ -539,7 +610,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
 <div class="page" id="page-planilha">
 
   <div class="card">
-    <div class="ct">Planilha de Registro de Produção</div>
+    <div class="ct">Registro de Produção</div>
     <div class="ms" style="margin-bottom:1rem;">
       Envie o arquivo <strong>Registro de Produção</strong> (<strong>.xlsb</strong> ou <strong>.xlsx</strong>)
       indicando <strong>de qual unidade</strong> ele é. O app lê a aba <strong>"Rel Geral"</strong> e extrai,
@@ -566,7 +637,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   </div>
 
   <div class="card">
-    <div class="ct">Planilhas carregadas por unidade</div>
+    <div class="ct">Registros de Produção carregados por unidade</div>
     <div class="tw">
       <table id="pl-lista-tabela" style="min-width:0;">
         <thead><tr><th>Unidade</th><th>Arquivo</th><th>Lotes</th><th>Enviada em</th><th>Por</th><th></th></tr></thead>
@@ -2019,8 +2090,8 @@ const MODOS_GRAFICO = {
   lote:         {rotulo:'Lote',              descricao:'Lotes ordenados da esquerda (plantio mais antigo) para a direita (plantio mais recente). O clima mostrado é o do dia de plantio de cada lote.', clima:true},
   mes:          {rotulo:'Mês de avaliação',  descricao:'Taxa ponderada por mês de avaliação.', clima:false},
   mes_plantio:  {rotulo:'Mês de plantio',    descricao:'Taxa ponderada, agrupada pelo mês em que as mudas foram plantadas.', clima:false},
-  clone:        {rotulo:'Clone (mensal)',        descricao:'Uma linha por clone ao longo dos meses de avaliação. Mostra até 10 clones com maior volume de mudas.', clima:false},
-  colaboradora: {rotulo:'Colaboradora (mensal)', descricao:'Uma linha por colaboradora ao longo dos meses de avaliação. Mostra até 10 com maior volume de mudas.', clima:false},
+  clone:        {rotulo:'Clone (mensal)',        descricao:'Taxa de ENRAIZAMENTO ponderada, uma linha por clone ao longo dos meses de avaliação (sem a linha de sobrevivência). Mostra até 10 clones com maior volume de mudas.', clima:false, soEnraizamento:true},
+  colaboradora: {rotulo:'Colaboradora (mensal)', descricao:'Taxa de ENRAIZAMENTO ponderada, uma linha por colaboradora ao longo dos meses de avaliação (sem a linha de sobrevivência). Mostra até 10 com maior volume de mudas.', clima:false, soEnraizamento:true},
 };
 
 // Monta rótulos, séries e (quando faz sentido) a data usada para o clima
@@ -2204,6 +2275,9 @@ function renderGraficoPrincipal(filtrados){
   const climaLigado = info.clima && document.getElementById('ck-clima').checked;
   const datasets = [...dados.datasets];
   const escalas = { y:{ min:0, max:100, position:'left', ticks:{ callback:v=>v+'%' } } };
+  // Nos modos por clone/colaboradora cada linha é uma categoria, então o
+  // eixo Y é quem informa qual métrica está sendo plotada.
+  if(info.soEnraizamento) escalas.y.title = { display:true, text:'Enraizamento ponderado (%)' };
   if(dados.tituloEixoX) escalas.x = { title:{ display:true, text: dados.tituloEixoX } };
 
   if(climaLigado && climaDados && dados.datasClima && dados.temDados){
@@ -2237,6 +2311,9 @@ function renderGraficoPrincipal(filtrados){
         label: ctx=>{
           const v = ctx.parsed.y;
           if(v===null || v===undefined) return ctx.dataset.label+': –';
+          // Nos modos por categoria a legenda é o nome do clone/colaboradora,
+          // então o tooltip diz qual métrica é aquele percentual.
+          if(info.soEnraizamento) return ctx.dataset.label+' — enraizamento: '+v.toFixed(1)+'%';
           const sufixo = ctx.dataset.label.includes('%') ? '%'
             : ctx.dataset.label.includes('°C') ? ' °C'
             : ctx.dataset.label.includes('mm') ? ' mm' : '';
