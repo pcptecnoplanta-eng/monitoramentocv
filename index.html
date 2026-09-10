@@ -622,7 +622,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       <div class="ct" style="margin-bottom:0;">Aplicação de defensivos</div>
       <div class="xb">
         <span class="lc" id="df-count">0 registros</span>
-        <button class="btn bs" style="padding:5px 12px;font-size:11px;" onclick="carregarDefensivos(true)">Atualizar</button>
+        <button class="btn bs" style="padding:5px 12px;font-size:11px;" onclick="carregarDefensivos()">Atualizar</button>
         <button class="btn be" style="padding:5px 12px;font-size:11px;" onclick="exportarDefensivos()">Exportar Excel</button>
       </div>
     </div>
@@ -632,27 +632,19 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     </div>
 
     <div class="g4" style="margin-bottom:10px;">
-      <div class="field"><label>Tabela de origem</label>
-        <select id="df-tabela" onchange="onTrocarTabelaDefensivos()">
-          <option value="">Carregando...</option>
-        </select>
-      </div>
-      <div class="field"><label>Ou digite o nome da tabela</label>
-        <div class="inline-add">
-          <input type="text" id="df-tabela-manual" placeholder="ex.: aplicacoes" onkeydown="if(event.key==='Enter'){event.preventDefault();onTrocarTabelaDefensivos();}">
-          <button type="button" class="btn bp" onclick="onTrocarTabelaDefensivos()">Carregar</button>
-        </div>
-      </div>
-      <div class="field"><label>Buscar</label><input type="text" id="df-busca" placeholder="Defensivo, clone, lote..." oninput="paginaDef=1;renderDefensivos()"></div>
-      <div class="g2" style="gap:8px;">
-        <div class="field"><label>Data — início</label><input type="date" id="df-data-ini" onchange="paginaDef=1;renderDefensivos()"></div>
-        <div class="field"><label>Data — fim</label><input type="date" id="df-data-fim" onchange="paginaDef=1;renderDefensivos()"></div>
+      <div class="field"><label>Buscar</label><input type="text" id="df-busca" placeholder="Produto, CV, válvula..." oninput="paginaDef=1;renderDefensivos()"></div>
+      <div class="field"><label>Data — início</label><input type="date" id="df-data-ini" onchange="paginaDef=1;renderDefensivos()"></div>
+      <div class="field"><label>Data — fim</label><input type="date" id="df-data-fim" onchange="paginaDef=1;renderDefensivos()"></div>
+      <div class="field"><label>Coluna de data do filtro</label>
+        <select id="df-coluna-data" onchange="paginaDef=1;renderDefensivos()"><option value="">Nenhuma</option></select>
       </div>
     </div>
     <div class="filtro-rodape" style="margin-bottom:10px;">
-      <div class="field" style="max-width:260px;"><label>Coluna de data usada no filtro</label>
-        <select id="df-coluna-data" onchange="paginaDef=1;renderDefensivos()"><option value="">Nenhuma</option></select>
-      </div>
+      <label class="chk-label" style="margin-top:0;">
+        <input type="checkbox" id="df-so-cv" checked onchange="paginaDef=1;renderDefensivos()">
+        <span class="box"></span>
+        Mostrar apenas aplicações em locais com "CV" no nome
+      </label>
       <button class="btn bs" style="margin-left:auto;" onclick="limparFiltrosDefensivos()">Limpar filtros</button>
     </div>
 
@@ -1136,6 +1128,7 @@ async function iniciarSessao(user){
     carregarLancamentos(),
     carregarConfig(),
     carregarPlanilha(),
+    carregarDefensivos(),
     user.permissao==='admin' ? carregarUsuarios() : Promise.resolve()
   ]);
 
@@ -1670,7 +1663,7 @@ function trocarAba(pageId, btn){
     Promise.all([carregarLancamentos(), carregarPlanilha()]).then(()=>{ popularFiltros(); renderDashboard(); });
   }
   if(pageId==='page-defensivos'){
-    carregarDefensivos(false);
+    carregarDefensivos();
   }
   if(pageId==='page-planilha'){
     renderPlanilha();
@@ -2143,6 +2136,61 @@ function montarDadosGrafico(modo, filtrados){
   return {labels, datasets, datasClima, tituloEixoX, temDados: chaves.length>0, grupos, chaves};
 }
 
+// Monta as linhas extras do tooltip: o que foi aplicado naquele dia, em
+// quais CVs, e quais válvulas de cada CV. Devolve [] quando não há nada,
+// para o tooltip continuar limpo.
+function aplicacoesDoDiaParaTooltip(dia, unidadeAlvo){
+  if(!dia || !defensivosLinhas.length) return [];
+
+  const doDia = defensivosLinhas.filter(l=>{
+    const v = l[APLIC_COLS.data];
+    if(!v || String(v).slice(0,10) !== dia) return false;
+    if(!ehLocalCV(l)) return false;
+    // Se o dashboard está filtrado por uma unidade, respeita isso.
+    if(unidadeAlvo && String(l[APLIC_COLS.unidade]||'').trim() !== unidadeAlvo) return false;
+    return true;
+  });
+  if(!doDia.length) return [];
+
+  // Agrupa: produto → CV → conjunto de válvulas.
+  const porProduto = {};
+  doDia.forEach(l=>{
+    const prod = String(l[APLIC_COLS.produto] ?? '').trim() || '(produto não informado)';
+    const cv = rotuloCV(l) || '(local não informado)';
+    const vl = String(l[APLIC_COLS.valvula] ?? '').trim();
+    if(!porProduto[prod]) porProduto[prod] = {};
+    if(!porProduto[prod][cv]) porProduto[prod][cv] = new Set();
+    if(vl) porProduto[prod][cv].add(vl);
+  });
+
+  // Ordena válvulas numericamente quando são números ("2" antes de "10").
+  const ordenarValvulas = (a,b)=>{
+    const na = parseFloat(a), nb = parseFloat(b);
+    const aNum = /^\d+$/.test(a), bNum = /^\d+$/.test(b);
+    if(aNum && bNum) return na-nb;
+    if(aNum) return -1;
+    if(bNum) return 1;
+    return a.localeCompare(b);
+  };
+
+  const linhas = ['', 'Aplicações neste dia:'];
+  Object.keys(porProduto).sort().forEach(prod=>{
+    linhas.push('• '+prod);
+    const cvs = porProduto[prod];
+    Object.keys(cvs).sort((a,b)=> ordenarValvulas(a.replace(/\D/g,''), b.replace(/\D/g,''))).forEach(cv=>{
+      const vals = [...cvs[cv]].sort(ordenarValvulas);
+      linhas.push('    '+cv + (vals.length ? ' — válvula(s): '+vals.join(', ') : ''));
+    });
+  });
+
+  // Tooltips gigantes ficam ilegíveis; corta e avisa quanto sobrou.
+  if(linhas.length > 24){
+    const restantes = linhas.length - 24;
+    return linhas.slice(0, 24).concat(['... e mais '+restantes+' linha(s)']);
+  }
+  return linhas;
+}
+
 function renderGraficoPrincipal(filtrados){
   const modo = document.getElementById('gr-modo').value;
   const info = MODOS_GRAFICO[modo];
@@ -2193,6 +2241,12 @@ function renderGraficoPrincipal(filtrados){
             : ctx.dataset.label.includes('°C') ? ' °C'
             : ctx.dataset.label.includes('mm') ? ' mm' : '';
           return ctx.dataset.label.replace(/ \(.*\)/,'')+': '+v.toFixed(1)+sufixo;
+        },
+        afterBody: (itens)=>{
+          // Nos modos com uma data por ponto, mostra o que foi aplicado
+          // naquele dia, agrupado por CV, com as válvulas de cada um.
+          const dia = dados.datasClima ? dados.datasClima[itens[0].dataIndex] : null;
+          return aplicacoesDoDiaParaTooltip(dia, document.getElementById('fi-unidade').value || null);
         }
       } } }
     }
@@ -2220,24 +2274,21 @@ function renderGraficoPrincipal(filtrados){
 }
 
 // ══════════════════ DEFENSIVOS (projeto Controle de Aplicação) ══════════
-// Este é um segundo projeto Supabase, só de leitura. Como não sabemos de
-// antemão o nome das tabelas de lá, o app pergunta ao próprio PostgREST
-// quais existem (endpoint raiz devolve um OpenAPI com a lista) e tenta
-// escolher sozinho a que parece ser a de aplicações.
+// Segundo projeto Supabase, somente leitura. A tabela é fixa ("aplicacoes")
+// e os dados são recarregados a cada abertura da página, para refletir o
+// que foi lançado no sistema de origem.
 const APLIC_URL = 'https://awbyfboedszwczukxqzo.supabase.co';
 const APLIC_KEY = 'sb_publishable_d7sIlkDbmhStHgFAUALMLw_w8XPh5Ei';
-const APLIC_TABELA_KEY = 'defensivos_tabela_v1';
+const APLIC_TABELA = 'aplicacoes';
 
 let defensivosLinhas = [];
 let defensivosColunas = [];
-let defensivosTabelas = [];
 let paginaDef = 1;
 
-// Busca os registros por fetch direto (em vez do cliente) para conseguir
-// mostrar a mensagem exata que o servidor devolve quando algo dá errado —
-// "Invalid API key", "No API key found", RLS, nome de tabela errado, etc.
+// Busca os registros por fetch direto para conseguir mostrar a mensagem
+// exata que o servidor devolve quando algo dá errado.
 async function buscarTabelaAplic(tabela){
-  const url = APLIC_URL+'/rest/v1/'+encodeURIComponent(tabela)+'?select=*&limit=5000';
+  const url = APLIC_URL+'/rest/v1/'+encodeURIComponent(tabela)+'?select=*&limit=10000';
   const resp = await fetch(url, {
     headers: {apikey: APLIC_KEY, Authorization: 'Bearer '+APLIC_KEY, Accept: 'application/json'}
   });
@@ -2250,81 +2301,43 @@ async function buscarTabelaAplic(tabela){
   try{ return JSON.parse(texto); }catch(e){ throw new Error('Resposta inesperada do servidor.'); }
 }
 
-async function listarTabelasAplic(){
-  const resp = await fetch(APLIC_URL+'/rest/v1/', {headers:{apikey: APLIC_KEY}});
-  if(!resp.ok) throw new Error('HTTP '+resp.status);
-  const spec = await resp.json();
-  const caminhos = Object.keys(spec.paths || {});
-  return caminhos.filter(c=> c.startsWith('/') && c.length>1 && !c.includes('{') && !c.startsWith('/rpc/'))
-                 .map(c=> c.slice(1)).sort();
+// Colunas reais da tabela "aplicacoes". Fixas, já que a estrutura é
+// conhecida — nada de adivinhar por padrão de nome.
+const APLIC_COLS = {
+  data:'data', unidade:'unidade', local:'local', valvula:'valvula',
+  produto:'produto', clone:'clone', metodo:'metodo', dosagem:'dosagem',
+  aplicador:'aplicador', principioAtivo:'principio_ativo', classe:'classe',
+  patogenoAlvo:'patogeno_alvo', trilho:'trilho'
+};
+
+// "CV" no viveiro é a Casa de Vegetação — nos registros o local vem escrito
+// por extenso ("CASA DE VEGETAÇÃO 4"). Aceitamos as duas formas.
+function ehLocalCV(linha){
+  const local = String(linha[APLIC_COLS.local] ?? '');
+  return /casa\s*de\s*vegeta/i.test(local) || /\bcv\b/i.test(local);
 }
 
-// Escolhe a tabela mais provável quando o usuário ainda não escolheu.
-function palpiteTabelaDefensivos(tabelas){
-  const salva = localStorage.getItem(APLIC_TABELA_KEY);
-  if(salva && tabelas.includes(salva)) return salva;
-  const pontuar = (t)=>{
-    const n = t.toLowerCase();
-    let p = 0;
-    if(n.includes('aplica')) p += 5;
-    if(n.includes('defensiv')) p += 5;
-    if(n.includes('produto')) p += 2;
-    if(n.includes('pulveriz')) p += 3;
-    if(n.includes('registro')) p += 1;
-    return p;
-  };
-  const ordenadas = [...tabelas].sort((a,b)=> pontuar(b)-pontuar(a));
-  return (ordenadas.length && pontuar(ordenadas[0])>0) ? ordenadas[0] : (tabelas[0]||'');
+// Extrai o número do CV: "CASA DE VEGETAÇÃO 4" → "4". Serve para rotular
+// de forma curta e para casar com o campo CV dos lançamentos.
+function numeroDoCV(linha){
+  const local = String(linha[APLIC_COLS.local] ?? '');
+  const m = local.match(/(\d+)\s*$/);
+  return m ? m[1] : local.trim();
 }
 
-async function carregarDefensivos(forcar){
+function rotuloCV(linha){
+  const n = numeroDoCV(linha);
+  return /^\d+$/.test(n) ? ('CV '+n) : n;
+}
+
+async function carregarDefensivos(){
   const status = document.getElementById('df-status');
-  const selTabela = document.getElementById('df-tabela');
-  const manual = document.getElementById('df-tabela-manual');
-
-  // 1) Tenta descobrir as tabelas. Muitos projetos bloqueiam essa listagem
-  //    (o endpoint raiz responde 401), e tudo bem: se já sabemos o nome da
-  //    tabela, nem tentamos — assim não fica erro à toa no console.
-  const jaConhecida = (manual.value.trim() || localStorage.getItem(APLIC_TABELA_KEY) || '').trim();
-  if((!defensivosTabelas.length || forcar) && !jaConhecida){
-    status.textContent = 'Conectando ao Controle de Aplicação...';
-    try{
-      defensivosTabelas = await listarTabelasAplic();
-      if(defensivosTabelas.length){
-        const escolhida = selTabela.value || palpiteTabelaDefensivos(defensivosTabelas);
-        selTabela.innerHTML = defensivosTabelas.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-        selTabela.value = escolhida;
-        selTabela.disabled = false;
-      }
-    }catch(e){
-      console.warn('Listagem de tabelas indisponível neste projeto (normal):', e.message);
-      selTabela.innerHTML = '<option value="">(listagem indisponível)</option>';
-      selTabela.disabled = true;
-    }
-  } else if(jaConhecida){
-    selTabela.innerHTML = '<option value="'+escapeHtml(jaConhecida)+'">'+escapeHtml(jaConhecida)+'</option>';
-    selTabela.disabled = true;
-  }
-
-  // 2) Define a tabela a consultar: o que estiver digitado tem prioridade.
-  const tabela = (manual.value.trim() || selTabela.value || localStorage.getItem(APLIC_TABELA_KEY) || '').trim();
-  if(!tabela){
-    status.textContent = 'Não consegui listar as tabelas deste projeto. Digite o nome da tabela de aplicações no campo "Nome da tabela" e clique em Carregar.';
-    defensivosLinhas = []; defensivosColunas = [];
-    renderDefensivos();
-    return;
-  }
-
+  status.textContent = 'Carregando aplicações...';
   try{
-    status.textContent = 'Carregando registros de "'+tabela+'"...';
-    const data = await buscarTabelaAplic(tabela);
-
+    const data = await buscarTabelaAplic(APLIC_TABELA);
     defensivosLinhas = data || [];
     defensivosColunas = defensivosLinhas.length ? Object.keys(defensivosLinhas[0]) : [];
-    localStorage.setItem(APLIC_TABELA_KEY, tabela);
-    if(manual.value.trim()) manual.value = tabela;
 
-    // Popula o seletor de coluna de data com as colunas que parecem datas.
     const selData = document.getElementById('df-coluna-data');
     const anterior = selData.value;
     const candidatas = defensivosColunas.filter(c=>{
@@ -2333,32 +2346,28 @@ async function carregarDefensivos(forcar){
       return typeof v==='string' && /^\d{4}-\d{2}-\d{2}/.test(v);
     });
     selData.innerHTML = '<option value="">Nenhuma</option>' + candidatas.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    selData.value = candidatas.includes(anterior) ? anterior : (candidatas[0] || '');
+    selData.value = candidatas.includes(anterior) ? anterior : (APLIC_COLS.data || candidatas[0] || '');
 
-    status.textContent = defensivosLinhas.length
-      ? ''
-      : 'A tabela "'+tabela+'" não retornou registros (pode estar vazia ou sem permissão de leitura para a chave pública).';
+    status.textContent = defensivosLinhas.length ? '' : 'Nenhum registro retornado.';
     paginaDef = 1;
     renderDefensivos();
+    // O gráfico do Dashboard usa esses dados no tooltip.
+    if(document.getElementById('page-dashboard').classList.contains('active')) renderDashboard();
   }catch(e){
     console.error(e);
     const msg = e.message||'';
     const ehBloqueio = /failed to fetch|networkerror|load failed/i.test(msg);
     status.textContent = ehBloqueio
-      ? 'Não foi possível conectar ao Controle de Aplicação. Confirme que o netlify.toml atualizado (com '+APLIC_URL+' em connect-src) foi publicado.'
-      : 'Não foi possível ler a tabela "'+tabela+'": '+msg+'. Verifique o nome da tabela e se a leitura está liberada para a chave pública (RLS) naquele projeto.';
+      ? 'Não foi possível conectar ao Controle de Aplicação. Confirme que o netlify.toml atualizado foi publicado.'
+      : 'Não foi possível carregar as aplicações: '+msg;
     defensivosLinhas = []; defensivosColunas = [];
     renderDefensivos();
   }
 }
 
-function onTrocarTabelaDefensivos(){
-  paginaDef = 1;
-  carregarDefensivos(false);
-}
-
 function limparFiltrosDefensivos(){
   document.getElementById('df-busca').value = '';
+  document.getElementById('df-so-cv').checked = true;
   document.getElementById('df-data-ini').value = '';
   document.getElementById('df-data-fim').value = '';
   paginaDef = 1;
@@ -2370,8 +2379,10 @@ function defensivosFiltrados(){
   const colData = document.getElementById('df-coluna-data').value;
   const dIni = document.getElementById('df-data-ini').value;
   const dFim = document.getElementById('df-data-fim').value;
+  const soCV = document.getElementById('df-so-cv').checked;
 
   return defensivosLinhas.filter(l=>{
+    if(soCV && !ehLocalCV(l)) return false;
     if(busca){
       const texto = defensivosColunas.map(c=> String(l[c] ?? '')).join(' ').toLowerCase();
       if(!texto.includes(busca)) return false;
