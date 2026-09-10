@@ -722,17 +722,19 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   <div class="card" id="pa-config-card">
     <div class="ct">Origem dos dados</div>
     <div class="ms" style="margin-bottom:.75rem;">
-      Para o app conseguir ler as planilhas do navegador, cada aba precisa estar publicada como CSV.
-      No Google Sheets: <em>Arquivo → Compartilhar → Publicar na web</em>, escolha a aba,
-      formato <strong>CSV</strong>, e cole aqui o endereço gerado — um para cada unidade.
+      Cole o endereço de cada aba. Pode ser o <strong>link normal da planilha</strong> (com o
+      <code>gid</code> da aba na barra de endereços) — o app converte sozinho para CSV — desde que a
+      planilha esteja acessível a quem tem o link. Se ela for restrita, use
+      <em>Arquivo → Compartilhar → Publicar na web</em>, escolha a aba, formato <strong>CSV</strong>,
+      e cole aqui o endereço gerado.
     </div>
     <div class="field" style="margin-bottom:10px;">
-      <label>UBR — CSV da aba "Equipe coleta UBR"</label>
-      <input type="text" id="pa-url-ubr" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=...&single=true&output=csv">
+      <label>UBR — aba "Equipe coleta UBR"</label>
+      <input type="text" id="pa-url-ubr" placeholder="link da planilha com ?gid=... ou CSV publicado">
     </div>
     <div class="field" style="margin-bottom:10px;">
-      <label>UBN — CSV da aba "Equipe coleta UBN"</label>
-      <input type="text" id="pa-url-ubn" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=...&single=true&output=csv">
+      <label>UBN — aba "Equipe coleta UBN"</label>
+      <input type="text" id="pa-url-ubn" placeholder="link da planilha com ?gid=... ou CSV publicado">
     </div>
     <button type="button" class="btn bp" onclick="salvarUrlsEquipe()">Salvar e carregar</button>
     <div class="ms" id="pa-config-status" style="margin-top:.75rem;"></div>
@@ -2555,11 +2557,35 @@ async function salvarUrlsEquipe(){
   carregarPessoasAtivas(true);
 }
 
+// Aceita tanto o endereço "publicado como CSV" quanto o link normal de
+// edição da planilha — neste caso, converte para o endpoint que devolve
+// CSV, em vez de tentar ler a página inteira do Google Sheets.
+function normalizarUrlPlanilha(url){
+  const u = String(url||'').trim();
+  if(!u) return '';
+  // Já é um CSV (publicado ou exportado): usa como está.
+  if(/output=csv|tqx=out:csv|format=csv/i.test(u)) return u;
+
+  const id = (u.match(/\/spreadsheets\/d\/(?:e\/)?([a-zA-Z0-9-_]+)/) || [])[1];
+  if(!id) return u;
+  const gid = (u.match(/[#&?]gid=(\d+)/) || [])[1] || '0';
+  return 'https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:csv&gid='+gid;
+}
+
 // Lê uma aba publicada e devolve as pessoas ativas dela.
 async function lerEquipeCSV(url, unidade, forcar){
-  const resp = await fetch(url, {cache: forcar ? 'reload' : 'default'});
+  const alvo = normalizarUrlPlanilha(url);
+  const resp = await fetch(alvo, {cache: forcar ? 'reload' : 'default'});
   if(!resp.ok) throw new Error('HTTP '+resp.status);
-  const linhas = parseCSV(await resp.text());
+  const texto = await resp.text();
+
+  // Quando a planilha não está publicada/compartilhada, o Google devolve
+  // uma página HTML (login ou erro) em vez do CSV.
+  if(/^\s*</.test(texto) || /<!doctype html|<html/i.test(texto.slice(0,300))){
+    throw new Error('o endereço devolveu uma página do Google, não o CSV — publique a aba na web (Arquivo → Compartilhar → Publicar na web → CSV) ou deixe a planilha visível para quem tem o link');
+  }
+
+  const linhas = parseCSV(texto);
 
   // Cabeçalho na linha 2 → dados a partir da linha 3 (índice 2).
   // Coluna B = nome (índice 1), C = função (2), D = ativo (3).
