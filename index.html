@@ -49,6 +49,8 @@ nav{background:var(--sf);border-bottom:1px solid var(--brl);padding:0 1.5rem;dis
 .rank-badge.r2{background:#E3E3E0;color:#5C5C58;}
 .rank-badge.r3{background:#EFCBAE;color:#8A4A22;}
 tr.linha-ativa td{background:var(--gll);}
+tr.linha-filtros th{background:var(--yll);padding:5px 6px;}
+tr.linha-filtros input,tr.linha-filtros select{padding:5px 7px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:normal;}
 tr.linha-ativa:hover td{background:var(--gl);}
 .tag-ativa{display:inline-block;background:var(--gm);color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:10px;margin-left:6px;vertical-align:middle;}
 .page{display:none;padding:1.25rem 1.5rem 4rem;max-width:1200px;margin:0 auto;}
@@ -717,7 +719,14 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     <div class="ms" id="pa-status" style="margin-bottom:.75rem;"></div>
     <div class="tw">
       <table id="pa-tabela" style="min-width:0;">
-        <thead><tr><th>Unidade</th><th>Nº</th><th>Colaboradora</th></tr></thead>
+        <thead>
+          <tr><th>Unidade</th><th>Nº</th><th>Colaboradora</th></tr>
+          <tr class="linha-filtros">
+            <th><select id="pa-f-unidade" onchange="renderPessoasAtivas()"><option value="">Todas</option></select></th>
+            <th><input type="text" id="pa-f-numero" placeholder="Filtrar" oninput="renderPessoasAtivas()"></th>
+            <th><input type="text" id="pa-f-nome" placeholder="Filtrar" oninput="renderPessoasAtivas()"></th>
+          </tr>
+        </thead>
         <tbody id="pa-tbody"></tbody>
       </table>
     </div>
@@ -2682,29 +2691,58 @@ function nomeNoApp(pessoa){
 }
 
 function renderPessoasAtivas(){
-  document.getElementById('pa-count').textContent = pessoasAtivas.length
-    ? (pessoasAtivas.length+' pessoa'+(pessoasAtivas.length!==1?'s':'')+' ativa'+(pessoasAtivas.length!==1?'s':''))
+  // Resolve o nome de cada pessoa e remove repetições: a mesma pessoa pode
+  // aparecer mais de uma vez na planilha (ou com número e nome diferentes
+  // apontando para a mesma colaboradora). Fica só a primeira ocorrência.
+  const vistos = new Set();
+  const pessoas = [];
+  pessoasAtivas.forEach(p=>{
+    const noApp = nomeNoApp(p);
+    const exibido = noApp || p.nome;
+    const chave = p.unidade+'||'+normalizarNome(exibido);
+    if(vistos.has(chave)) return;
+    vistos.add(chave);
+    pessoas.push({unidade:p.unidade, numero:p.numero, exibido, cadastrada: !!noApp});
+  });
+
+  document.getElementById('pa-count').textContent = pessoas.length
+    ? (pessoas.length+' pessoa'+(pessoas.length!==1?'s':'')+' ativa'+(pessoas.length!==1?'s':''))
     : '–';
 
-  const ordenadas = [...pessoasAtivas].sort((a,b)=>
+  // Opções do filtro de unidade, conforme o que existe na lista.
+  const selUn = document.getElementById('pa-f-unidade');
+  const unidades = [...new Set(pessoas.map(p=>p.unidade))].sort();
+  const unAtual = selUn.value;
+  selUn.innerHTML = '<option value="">Todas</option>' + unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+  if(unidades.includes(unAtual)) selUn.value = unAtual;
+
+  const fUn = selUn.value;
+  const fNum = document.getElementById('pa-f-numero').value.trim().toLowerCase();
+  const fNome = document.getElementById('pa-f-nome').value.trim().toLowerCase();
+
+  const filtradas = pessoas.filter(p=>{
+    if(fUn && p.unidade !== fUn) return false;
+    if(fNum && !String(p.numero||'').toLowerCase().includes(fNum)) return false;
+    if(fNome && !p.exibido.toLowerCase().includes(fNome)) return false;
+    return true;
+  }).sort((a,b)=>
     a.unidade.localeCompare(b.unidade) ||
     (parseInt(a.numero)||0) - (parseInt(b.numero)||0) ||
-    a.nome.localeCompare(b.nome)
+    a.exibido.localeCompare(b.exibido)
   );
 
-  document.getElementById('pa-tbody').innerHTML = ordenadas.map(p=>{
-    const noApp = nomeNoApp(p);
-    return `<tr>
+  document.getElementById('pa-tbody').innerHTML = filtradas.map(p=>`
+    <tr>
       <td>${escapeHtml(p.unidade)}</td>
       <td>${escapeHtml(p.numero || '–')}</td>
-      <td>${noApp
-        ? escapeHtml(noApp)
-        : escapeHtml(p.nome)+' <span class="ms" style="display:inline;">(ainda não cadastrada no app)</span>'}</td>
-    </tr>`;
-  }).join('');
+      <td>${escapeHtml(p.exibido)}${p.cadastrada ? '' : ' <span class="ms" style="display:inline;">(ainda não cadastrada no app)</span>'}</td>
+    </tr>`).join('');
 
-  document.getElementById('pa-empty').style.display = pessoasAtivas.length ? 'none' : 'block';
-  document.getElementById('pa-tabela').style.display = pessoasAtivas.length ? 'table' : 'none';
+  document.getElementById('pa-empty').style.display = filtradas.length ? 'none' : 'block';
+  document.getElementById('pa-empty').textContent = pessoas.length
+    ? 'Nenhuma pessoa corresponde aos filtros.'
+    : 'Nenhuma pessoa ativa encontrada.';
+  document.getElementById('pa-tabela').style.display = pessoas.length ? 'table' : 'none';
 
 
   // Mostra como cada pessoa da planilha foi casada com as colaboradoras.
