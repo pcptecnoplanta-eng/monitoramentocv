@@ -50,6 +50,10 @@ nav{background:var(--sf);border-bottom:1px solid var(--brl);padding:0 1.5rem;dis
 .rank-badge.r3{background:#EFCBAE;color:#8A4A22;}
 tr.linha-ativa td{background:var(--gll);}
 tr.linha-filtros th{background:var(--yll);padding:5px 6px;}
+tr.linha-ultima td{border-top:2px solid var(--rd);border-bottom:2px solid var(--rd);}
+tr.linha-ultima td:first-child{border-left:2px solid var(--rd);}
+tr.linha-ultima td:last-child{border-right:2px solid var(--rd);}
+td.celula-escala{font-weight:600;text-align:center;font-family:var(--mo);}
 tr.linha-filtros input,tr.linha-filtros select{padding:5px 7px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:normal;}
 tr.linha-ativa:hover td{background:var(--gl);}
 .tag-ativa{display:inline-block;background:var(--gm);color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:10px;margin-left:6px;vertical-align:middle;}
@@ -3642,6 +3646,39 @@ function calcularRanking(){
   });
 }
 
+// Escala de cor do ranking: 1º lugar verde, último preto, passando por
+// amarelo, laranja, vermelho e vermelho escuro. Recebe t entre 0 e 1
+// (posição relativa na lista) e devolve o fundo e a cor do texto.
+const ESCALA_RANKING = [
+  {t:0.00, rgb:[0,145,70]},    // verde
+  {t:0.25, rgb:[227,192,0]},   // amarelo
+  {t:0.45, rgb:[224,123,0]},   // laranja
+  {t:0.65, rgb:[208,48,48]},   // vermelho
+  {t:0.85, rgb:[126,20,20]},   // vermelho escuro
+  {t:1.00, rgb:[26,26,26]},    // preto
+];
+
+function corEscalaRanking(t){
+  const p = Math.max(0, Math.min(1, t));
+  let a = ESCALA_RANKING[0], b = ESCALA_RANKING[ESCALA_RANKING.length-1];
+  for(let i=0; i<ESCALA_RANKING.length-1; i++){
+    if(p >= ESCALA_RANKING[i].t && p <= ESCALA_RANKING[i+1].t){
+      a = ESCALA_RANKING[i]; b = ESCALA_RANKING[i+1]; break;
+    }
+  }
+  const intervalo = (b.t - a.t) || 1;
+  const f = (p - a.t) / intervalo;
+  const rgb = a.rgb.map((v,i)=> Math.round(v + (b.rgb[i]-v)*f));
+
+  // Texto branco quando o fundo é escuro, preto quando é claro — a fórmula
+  // de luminância evita amarelo com letra branca (ilegível).
+  const luminancia = (0.299*rgb[0] + 0.587*rgb[1] + 0.114*rgb[2]) / 255;
+  return {
+    fundo: 'rgb('+rgb.join(',')+')',
+    texto: luminancia > 0.6 ? '#2C2C2A' : '#fff'
+  };
+}
+
 function renderRanking(){
   const soAtivas = document.getElementById('rk-so-ativas').checked;
   const completa = calcularRanking();
@@ -3674,14 +3711,19 @@ function renderRanking(){
       : posicao;
     // Quem está na equipe ativa da planilha ganha destaque na linha.
     const ativa = colaboradoraEstaAtiva(g.colaboradoraNome, g.unidade, g.colaboradora);
-    return `<tr class="${ativa?'linha-ativa':''}">
+    // A cor vai do verde (1º) ao preto (último), pela posição na lista.
+    const t = lista.length > 1 ? (posicao-1)/(lista.length-1) : 0;
+    const cor = corEscalaRanking(t);
+    const ehUltimo = lista.length > 1 && posicao === lista.length;
+    const classes = [ativa?'linha-ativa':'', ehUltimo?'linha-ultima':''].filter(Boolean).join(' ');
+    return `<tr class="${classes}">
       <td>${badge}</td>
       <td>${escapeHtml(g.colaboradora)}${g.colaboradoraNome? ' – '+escapeHtml(g.colaboradoraNome) : ''}${ativa? ' <span class="tag-ativa">ativa</span>' : ''}</td>
       <td>${escapeHtml(g.unidade)}</td>
       <td>${g.lancamentos}</td>
       <td>${g.plantadas}</td>
       <td>${g.enraizadas}</td>
-      <td>${fmtPct(g.taxaEnraizamento)}</td>
+      <td class="celula-escala" style="background:${cor.fundo};color:${cor.texto};">${fmtPct(g.taxaEnraizamento)}</td>
       <td>${fmtPct(g.taxaSobrevivencia)}</td>
     </tr>`;
   }).join('');
