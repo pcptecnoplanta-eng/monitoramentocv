@@ -522,7 +522,10 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
         <span class="box"></span>
         Semana anterior — 15 plantios mais antigos
       </label>
-      <button class="btn bs" style="margin-left:auto;" onclick="limparFiltros()">Limpar filtros</button>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn bs" onclick="atualizarDadosDashboard()" title="Rebusca os lançamentos no servidor">Atualizar dados</button>
+        <button class="btn bs" onclick="limparFiltros()">Limpar filtros</button>
+      </div>
     </div>
     <div class="ms" id="fi-semana-info" style="margin-top:6px;"></div>
   </div>
@@ -1077,13 +1080,34 @@ function registroParaRow(r){
 }
 
 // ── CARREGAMENTO REMOTO ──────────────────────────────────
-async function carregarLancamentos(){
+// Cada leitura no Supabase consome Disk IO, e o app relia as mesmas
+// tabelas a cada troca de aba. Agora só relê quando os dados estão
+// "velhos" — ou quando alguém pede explicitamente (botões de atualizar,
+// e depois de gravar algo).
+const VALIDADE_CACHE = {
+  lancamentos: 120000,   // 2 min
+  config:      600000,   // 10 min (clones/colaboradoras mudam pouco)
+  planilha:   1800000,   // 30 min (é o dado mais pesado: JSON com milhares de lotes)
+  configApp:  1800000,   // 30 min
+};
+let ultimaCarga = {};
+
+function precisaRecarregar(chave, forcar){
+  if(forcar) return true;
+  const t = ultimaCarga[chave];
+  return !t || (Date.now() - t) > (VALIDADE_CACHE[chave] || 120000);
+}
+
+async function carregarLancamentos(forcar){
+  if(!precisaRecarregar('lancamentos', forcar)) return;
   const {data, error} = await sb.from('lancamentos').select('*').order('data',{ascending:false}).order('criado_em',{ascending:false});
   if(error){ avisoErroSupabase('carregar lançamentos', error); return; }
   db = (data||[]).map(rowParaRegistro);
+  ultimaCarga.lancamentos = Date.now();
 }
 
-async function carregarConfig(){
+async function carregarConfig(forcar){
+  if(!precisaRecarregar('config', forcar)) return;
   const [{data:clonesRows, error:e1}, {data:colabRows, error:e2}] = await Promise.all([
     sb.from('clones_unidade').select('*'),
     sb.from('colaboradoras_unidade').select('*')
@@ -1094,6 +1118,7 @@ async function carregarConfig(){
   UNIDADES.forEach(u=>{ config.clones[u] = []; config.colaboradoras[u] = {}; });
   (clonesRows||[]).forEach(r=>{ if(config.clones[r.unidade]) config.clones[r.unidade].push(r.clone); });
   (colabRows||[]).forEach(r=>{ if(config.colaboradoras[r.unidade]) config.colaboradoras[r.unidade][r.numero] = r.nome; });
+  ultimaCarga.config = Date.now();
 }
 
 // ── AUDITORIA (logging de ações sensíveis) ──────────────────────
@@ -1455,7 +1480,7 @@ async function adicionarClone(){
     return;
   }
   input.value='';
-  await carregarConfig();
+  await carregarConfig(true);
   renderConfigClones();
   atualizarOpcoesClone();
 }
@@ -1463,7 +1488,7 @@ async function adicionarClone(){
 async function removerClone(unidade, nome){
   const {error} = await sb.from('clones_unidade').delete().eq('unidade', unidade).eq('clone', nome);
   if(error){ avisoErroSupabase('remover clone', error); return; }
-  await carregarConfig();
+  await carregarConfig(true);
   renderConfigClones();
   atualizarOpcoesClone();
 }
@@ -1490,7 +1515,7 @@ async function adicionarColaboradora(){
   if(error){ avisoErroSupabase('salvar colaboradora', error); return; }
   document.getElementById('cfg-colab-numero').value='';
   document.getElementById('cfg-colab-nome').value='';
-  await carregarConfig();
+  await carregarConfig(true);
   renderConfigColaboradoras();
   atualizarNomeColaboradora();
 }
@@ -1499,7 +1524,7 @@ async function removerColaboradora(unidade, numero){
   if(!confirm('Remover esta colaboradora?')) return;
   const {error} = await sb.from('colaboradoras_unidade').delete().eq('unidade', unidade).eq('numero', numero);
   if(error){ avisoErroSupabase('remover colaboradora', error); return; }
-  await carregarConfig();
+  await carregarConfig(true);
   renderConfigColaboradoras();
   atualizarNomeColaboradora();
 }
@@ -1683,20 +1708,32 @@ async function salvarLancamento(e){
   btnSalvar.disabled = true;
   let erroSalvar = null;
   try{
+    // Pedimos a linha gravada de volta (.select) e atualizamos a lista em
+    // memória. Antes recarregávamos a tabela inteira a cada lançamento, o
+    // que gastava muito Disk IO à toa.
+    let salvo = null;
     if(editandoId){
-      const {error} = await sb.from('lancamentos').update(linha).eq('id', editandoId);
-      erroSalvar = error;
+      const {data, error} = await sb.from('lancamentos').update(linha).eq('id', editandoId).select().single();
+      erroSalvar = error; salvo = data;
     } else {
-      const {error} = await sb.from('lancamentos').insert(linha);
-      erroSalvar = error;
+      const {data, error} = await sb.from('lancamentos').insert(linha).select().single();
+      erroSalvar = error; salvo = data;
     }
     if(erroSalvar){ avisoErroSupabase('salvar lançamento', erroSalvar); return false; }
     registrarEvento(foiEdicao ? 'lancamento_editado' : 'lancamento_criado', unidade+' / '+registro.clone, usuarioAtual?.email);
+
+    if(salvo){
+      const novoReg = rowParaRegistro(salvo);
+      const idx = db.findIndex(r=> r.id === novoReg.id);
+      if(idx > -1) db[idx] = novoReg; else db.push(novoReg);
+      db.sort((a,b)=> b.data.localeCompare(a.data) || String(b.criadoEm).localeCompare(String(a.criadoEm)));
+    } else {
+      await carregarLancamentos(true); // sem retorno, relê por segurança
+    }
   } finally {
     btnSalvar.disabled = false;
   }
 
-  await carregarLancamentos();
   paginaLanc = 1;
   cancelarEdicao();
   if(foiEdicao){
@@ -1745,7 +1782,7 @@ async function excluirLancamento(id){
   const {error} = await sb.from('lancamentos').delete().eq('id', id);
   if(error){ avisoErroSupabase('excluir lançamento', error); return; }
   registrarEvento('lancamento_excluido', id, usuarioAtual?.email);
-  await carregarLancamentos();
+  db = db.filter(r=> r.id !== id);   // tira da lista sem reler a tabela
   paginaLanc = 1;
   renderTudo();
 }
@@ -1779,6 +1816,14 @@ function limparParaProximoLancamento(){
   document.getElementById('f-enraizadas').classList.remove('err');
   document.getElementById('f-mortas').classList.remove('err');
   atualizarNomeColaboradora();
+}
+
+// Rebusca os dados ignorando o cache — para quando alguém quer ver algo
+// que outra pessoa acabou de lançar.
+async function atualizarDadosDashboard(){
+  await Promise.all([carregarLancamentos(true), carregarPlanilha(true)]);
+  popularFiltros();
+  renderDashboard();
 }
 
 // ── ABAS ──────────────────────────────────
@@ -2506,10 +2551,12 @@ function colaboradoraEstaAtiva(nomeColaboradora, unidade, numeroColaboradora){
   });
 }
 
-async function carregarConfigApp(){
+async function carregarConfigApp(forcar){
+  if(!precisaRecarregar('configApp', forcar) && Object.keys(urlsEquipe).length) return;
   const chaves = EQUIPES.map(e=>e.chave);
   const {data, error} = await sb.from('config_app').select('*').in('chave', chaves);
   if(error){ console.warn('Falha ao ler config:', error); return; }
+  ultimaCarga.configApp = Date.now();
   urlsEquipe = {};
   (data||[]).forEach(linha=>{
     const eq = EQUIPES.find(e=> e.chave === linha.chave);
@@ -2544,7 +2591,7 @@ async function salvarUrlsEquipe(){
 
   status.textContent = 'Endereço(s) salvo(s).';
   registrarEvento('config_equipe_url', paraSalvar.map(x=>x.chave).join(', '), usuarioAtual?.email);
-  await carregarConfigApp();
+  await carregarConfigApp(true);
   carregarPessoasAtivas(true);
 }
 
@@ -3259,7 +3306,12 @@ async function enviarPlanilha(){
     status.textContent = 'Planilha da unidade '+unidade+' processada: '+resultado.totalLotes+' lotes salvos (substituiu a anterior desta unidade).';
     document.getElementById('pl-arquivo').value = '';
     arquivoPlanilha = null;
-    await carregarPlanilha();
+    // Já sabemos o que foi gravado — evita reler o JSON inteiro do banco.
+    planilhaDados[unidade] = {
+      unidade, dados: resultado.lotes, arquivo_nome: nomeArquivo,
+      total_lotes: resultado.totalLotes, enviado_em: new Date().toISOString(),
+      enviado_por: usuarioAtual ? usuarioAtual.email : null
+    };
     renderPlanilha();
   }catch(e){
     console.error(e);
@@ -3269,11 +3321,13 @@ async function enviarPlanilha(){
   }
 }
 
-async function carregarPlanilha(){
+async function carregarPlanilha(forcar){
+  if(!precisaRecarregar('planilha', forcar)) return;
   const {data, error} = await sb.from('planilha_rel_geral').select('*');
   if(error){ console.warn('Falha ao carregar planilhas:', error); return; }
   planilhaDados = {};
   (data||[]).forEach(linha=>{ planilhaDados[linha.unidade] = linha; });
+  ultimaCarga.planilha = Date.now();
 }
 
 async function removerPlanilha(unidade){
@@ -3281,7 +3335,7 @@ async function removerPlanilha(unidade){
   const {error} = await sb.from('planilha_rel_geral').delete().eq('unidade', unidade);
   if(error){ avisoErroSupabase('remover a planilha', error); return; }
   registrarEvento('planilha_removida', unidade, usuarioAtual?.email);
-  await carregarPlanilha();
+  delete planilhaDados[unidade];
   renderPlanilha();
 }
 
