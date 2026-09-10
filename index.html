@@ -715,7 +715,12 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
       as pessoas marcadas como tal na coluna D.
     </div>
     <div class="ms" id="pa-status" style="margin-bottom:.75rem;"></div>
-    <div id="pa-lista" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    <div class="tw">
+      <table id="pa-tabela" style="min-width:0;">
+        <thead><tr><th>Unidade</th><th>Nº</th><th>Colaboradora</th></tr></thead>
+        <tbody id="pa-tbody"></tbody>
+      </table>
+    </div>
     <div class="empty" id="pa-empty" style="display:none;">Nenhuma pessoa ativa encontrada.</div>
   </div>
 
@@ -2664,26 +2669,42 @@ async function carregarPessoasAtivas(forcar){
   if(document.getElementById('page-dashboard').classList.contains('active')) renderRanking();
 }
 
+// Resolve o nome como ele consta no app: primeiro o cadastro de
+// colaboradoras (Configurações), depois o nome gravado nos lançamentos.
+// Se a pessoa ainda não existe no app, devolve null.
+function nomeNoApp(pessoa){
+  const doCadastro = (config.colaboradoras[pessoa.unidade]||{})[pessoa.numero];
+  if(doCadastro) return doCadastro;
+  const doLancamento = db.find(r=>
+    r.unidade===pessoa.unidade && String(r.colaboradora).trim()===String(pessoa.numero) && r.colaboradoraNome
+  );
+  return doLancamento ? doLancamento.colaboradoraNome : null;
+}
+
 function renderPessoasAtivas(){
-  const cont = document.getElementById('pa-lista');
   document.getElementById('pa-count').textContent = pessoasAtivas.length
     ? (pessoasAtivas.length+' pessoa'+(pessoasAtivas.length!==1?'s':'')+' ativa'+(pessoasAtivas.length!==1?'s':''))
     : '–';
 
-  // Agrupa por unidade, cada uma com seu bloco de nomes.
-  const porUnidade = {};
-  pessoasAtivas.forEach(p=>{
-    if(!porUnidade[p.unidade]) porUnidade[p.unidade] = [];
-    porUnidade[p.unidade].push(p);
-  });
-  cont.innerHTML = Object.keys(porUnidade).sort().map(un=>`
-    <div style="width:100%;margin-bottom:.75rem;">
-      <div class="filtro-grupo">${escapeHtml(un)} — ${porUnidade[un].length} pessoa(s)</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${porUnidade[un].map(p=>`<span class="chip">${p.numero? '<strong>'+escapeHtml(p.numero)+'</strong> · ' : ''}${escapeHtml(p.nome)}</span>`).join('')}
-      </div>
-    </div>`).join('');
+  const ordenadas = [...pessoasAtivas].sort((a,b)=>
+    a.unidade.localeCompare(b.unidade) ||
+    (parseInt(a.numero)||0) - (parseInt(b.numero)||0) ||
+    a.nome.localeCompare(b.nome)
+  );
+
+  document.getElementById('pa-tbody').innerHTML = ordenadas.map(p=>{
+    const noApp = nomeNoApp(p);
+    return `<tr>
+      <td>${escapeHtml(p.unidade)}</td>
+      <td>${escapeHtml(p.numero || '–')}</td>
+      <td>${noApp
+        ? escapeHtml(noApp)
+        : escapeHtml(p.nome)+' <span class="ms" style="display:inline;">(ainda não cadastrada no app)</span>'}</td>
+    </tr>`;
+  }).join('');
+
   document.getElementById('pa-empty').style.display = pessoasAtivas.length ? 'none' : 'block';
+  document.getElementById('pa-tabela').style.display = pessoasAtivas.length ? 'table' : 'none';
 
 
   // Mostra como cada pessoa da planilha foi casada com as colaboradoras.
