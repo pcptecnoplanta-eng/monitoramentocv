@@ -2506,13 +2506,17 @@ function mesmaPessoa(nomeA, nomeB){
 
 // Uma colaboradora do app está ativa se casa com alguém da planilha.
 // Uma colaboradora do app está ativa se casa com alguém da planilha da
-// MESMA unidade — nomes iguais em unidades diferentes são pessoas
-// diferentes, então a unidade faz parte da comparação.
-function colaboradoraEstaAtiva(nomeColaboradora, unidade){
-  if(!nomeColaboradora || !pessoasAtivas.length) return false;
-  return pessoasAtivas.some(p=>
-    (!unidade || !p.unidade || p.unidade === unidade) && mesmaPessoa(p.nome, nomeColaboradora)
-  );
+// MESMA unidade. A comparação usa primeiro o número (coluna "Numero
+// Plantio" da planilha = nº da colaboradora no lançamento), que é exato;
+// o nome entra como alternativa quando o número não bate ou está vazio.
+function colaboradoraEstaAtiva(nomeColaboradora, unidade, numeroColaboradora){
+  if(!pessoasAtivas.length) return false;
+  const num = String(numeroColaboradora ?? '').trim();
+  return pessoasAtivas.some(p=>{
+    if(unidade && p.unidade && p.unidade !== unidade) return false;
+    if(num && p.numero && String(p.numero) === num) return true;
+    return nomeColaboradora ? mesmaPessoa(p.nome, nomeColaboradora) : false;
+  });
 }
 
 async function carregarConfigApp(){
@@ -2589,18 +2593,27 @@ async function lerEquipeCSV(url, unidade, forcar){
 
   const linhas = parseCSV(texto);
 
-  // A tabela de nomes vai da linha 3 até a linha ANTES de uma linha
-  // mesclada de A até D. No CSV, o texto de uma célula mesclada aparece
-  // na primeira coluna do intervalo (A) — que nas linhas de dados está
-  // sempre vazia. Então: coluna A preenchida = fim da tabela.
+  // Estrutura da aba: uma linha mesclada de A até D com o nome do mês
+  // ("Setembro"), o cabeçalho logo abaixo, e então as pessoas. Mais para
+  // baixo vem o bloco do mês anterior ("Agosto"), que NÃO deve ser lido.
+  //
+  // Nas linhas de pessoas a coluna A traz a numeração (1, 2, 3...), então
+  // o que identifica o título do próximo mês é a coluna A ter um texto que
+  // não é número. É essa a marca de fim — e ela funciona independente de
+  // quantas pessoas o bloco de cima tiver.
   const registros = [];
   for(let i=2; i<linhas.length; i++){
     const l = linhas[i] || [];
-    if(String(l[0] ?? '').trim() !== '') break; // chegou na linha mesclada
+    const colA = String(l[0] ?? '').trim();
+    if(colA && !/^\d+([.,]0+)?$/.test(colA)) break; // título do mês seguinte
+
     const nome = String(l[1] ?? '').trim();
     if(!nome) continue;
     if(!marcaAtivo(l[3])) continue;
-    registros.push({nome, funcao: String(l[2] ?? '').trim(), unidade});
+
+    // Coluna C = "Numero Plantio", o mesmo número usado nos lançamentos.
+    const numero = String(l[2] ?? '').trim().replace(/\.0+$/,'');
+    registros.push({nome, numero, unidade});
   }
   return registros;
 }
@@ -2667,29 +2680,31 @@ function renderPessoasAtivas(){
     <div style="width:100%;margin-bottom:.75rem;">
       <div class="filtro-grupo">${escapeHtml(un)} — ${porUnidade[un].length} pessoa(s)</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${porUnidade[un].map(p=>`<span class="chip">${escapeHtml(p.nome)}${p.funcao? ' · '+escapeHtml(p.funcao) : ''}</span>`).join('')}
+        ${porUnidade[un].map(p=>`<span class="chip">${p.numero? '<strong>'+escapeHtml(p.numero)+'</strong> · ' : ''}${escapeHtml(p.nome)}</span>`).join('')}
       </div>
     </div>`).join('');
   document.getElementById('pa-empty').style.display = pessoasAtivas.length ? 'none' : 'block';
 
+
   // Mostra como cada pessoa da planilha foi casada com as colaboradoras.
-  // A comparação respeita a unidade: só casa com quem lança naquela unidade.
+  // A comparação respeita a unidade e prioriza o número de plantio.
   const card = document.getElementById('pa-vinculo-card');
-  const nomesApp = [...new Set(db.filter(r=>r.colaboradoraNome).map(r=> r.unidade+'||'+r.colaboradoraNome))];
-  if(!pessoasAtivas.length || !nomesApp.length){ card.style.display='none'; return; }
+  const colabsApp = [...new Map(
+    db.filter(r=>r.colaboradora).map(r=> [r.unidade+'||'+r.colaboradora, {unidade:r.unidade, numero:String(r.colaboradora).trim(), nome:r.colaboradoraNome||''}])
+  ).values()];
+  if(!pessoasAtivas.length || !colabsApp.length){ card.style.display='none'; return; }
   card.style.display = 'block';
+
   document.getElementById('pa-vinculo-tbody').innerHTML = pessoasAtivas.map(p=>{
-    const casados = nomesApp
-      .filter(chave=>{
-        const [un, nome] = chave.split('||');
-        return un === p.unidade && mesmaPessoa(p.nome, nome);
-      })
-      .map(chave=> chave.split('||')[1]);
+    const porNumero = colabsApp.filter(c=> c.unidade===p.unidade && p.numero && c.numero===String(p.numero));
+    const porNome   = colabsApp.filter(c=> c.unidade===p.unidade && c.nome && mesmaPessoa(p.nome, c.nome));
+    const casados = [...new Map([...porNumero, ...porNome].map(c=>[c.numero, c])).values()];
+    const como = porNumero.length ? 'nº de plantio' : (porNome.length ? 'nome' : '');
     return `<tr>
       <td>${escapeHtml(p.unidade)}</td>
-      <td>${escapeHtml(p.nome)}</td>
+      <td>${p.numero? '<strong>'+escapeHtml(p.numero)+'</strong> · ' : ''}${escapeHtml(p.nome)}</td>
       <td>${casados.length
-        ? escapeHtml([...new Set(casados)].join(', '))
+        ? escapeHtml(casados.map(c=> c.numero + (c.nome? ' – '+c.nome : '')).join(', ')) + ' <span class="ms" style="display:inline;">(por '+como+')</span>'
         : '<span style="color:var(--txm);">sem correspondência nos lançamentos</span>'}</td>
     </tr>`;
   }).join('');
@@ -3585,7 +3600,7 @@ function renderRanking(){
       : posicao===3 ? '<span class="rank-badge r3">3</span>'
       : posicao;
     // Quem está na equipe ativa da planilha ganha destaque na linha.
-    const ativa = colaboradoraEstaAtiva(g.colaboradoraNome, g.unidade);
+    const ativa = colaboradoraEstaAtiva(g.colaboradoraNome, g.unidade, g.colaboradora);
     return `<tr class="${ativa?'linha-ativa':''}">
       <td>${badge}</td>
       <td>${escapeHtml(g.colaboradora)}${g.colaboradoraNome? ' – '+escapeHtml(g.colaboradoraNome) : ''}${ativa? ' <span class="tag-ativa">ativa</span>' : ''}</td>
