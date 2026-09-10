@@ -48,6 +48,9 @@ nav{background:var(--sf);border-bottom:1px solid var(--brl);padding:0 1.5rem;dis
 .rank-badge.r1{background:#F6E4A8;color:#8A6D1D;}
 .rank-badge.r2{background:#E3E3E0;color:#5C5C58;}
 .rank-badge.r3{background:#EFCBAE;color:#8A4A22;}
+tr.linha-ativa td{background:var(--gll);}
+tr.linha-ativa:hover td{background:var(--gl);}
+.tag-ativa{display:inline-block;background:var(--gm);color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:10px;margin-left:6px;vertical-align:middle;}
 .page{display:none;padding:1.25rem 1.5rem 4rem;max-width:1200px;margin:0 auto;}
 .page.active{display:block;}
 .card{background:var(--sf);border:1px solid var(--brl);border-radius:var(--rl2);padding:1.25rem;margin-bottom:1rem;}
@@ -338,6 +341,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
   <button class="nt active" data-page="page-lancamento" onclick="trocarAba('page-lancamento',this)">Lançamento</button>
   <button class="nt" data-page="page-dashboard" onclick="trocarAba('page-dashboard',this)">Dashboard</button>
   <button class="nt" data-page="page-planilha" onclick="trocarAba('page-planilha',this)">Registro de Produção</button>
+  <button class="nt" data-page="page-pessoas" onclick="trocarAba('page-pessoas',this)">Pessoas ativas</button>
   <button class="nt" data-page="page-defensivos" onclick="trocarAba('page-defensivos',this)">Defensivos</button>
   <button class="nt" data-page="page-config" onclick="trocarAba('page-config',this)">Configurações</button>
 </nav>
@@ -691,6 +695,62 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--txm);}
     </div>
     <div class="empty" id="pl-empty" style="display:none;">Nenhum lote para exibir com esse filtro.</div>
     <div class="pagination" id="pag-cruz"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ PESSOAS ATIVAS ═══════════════ -->
+<div class="page" id="page-pessoas">
+
+  <div class="card">
+    <div class="ltb">
+      <div class="ct" style="margin-bottom:0;">Equipe de coleta ativa</div>
+      <div class="xb">
+        <span class="lc" id="pa-count">–</span>
+        <button class="btn bs" style="padding:5px 12px;font-size:11px;" onclick="carregarPessoasAtivas(true)">Atualizar</button>
+      </div>
+    </div>
+    <div class="ms" style="margin-bottom:.75rem;">
+      Lista lida direto das planilhas de equipe (abas <strong>"Equipe coleta UBR"</strong> e
+      <strong>"Equipe coleta UBN"</strong>), sempre que a página é aberta. São consideradas ativas
+      as pessoas marcadas como tal na coluna D.
+    </div>
+    <div class="ms" id="pa-status" style="margin-bottom:.75rem;"></div>
+    <div id="pa-lista" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    <div class="empty" id="pa-empty" style="display:none;">Nenhuma pessoa ativa encontrada.</div>
+  </div>
+
+  <div class="card" id="pa-config-card">
+    <div class="ct">Origem dos dados</div>
+    <div class="ms" style="margin-bottom:.75rem;">
+      Para o app conseguir ler as planilhas do navegador, cada aba precisa estar publicada como CSV.
+      No Google Sheets: <em>Arquivo → Compartilhar → Publicar na web</em>, escolha a aba,
+      formato <strong>CSV</strong>, e cole aqui o endereço gerado — um para cada unidade.
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>UBR — CSV da aba "Equipe coleta UBR"</label>
+      <input type="text" id="pa-url-ubr" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=...&single=true&output=csv">
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>UBN — CSV da aba "Equipe coleta UBN"</label>
+      <input type="text" id="pa-url-ubn" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=...&single=true&output=csv">
+    </div>
+    <button type="button" class="btn bp" onclick="salvarUrlsEquipe()">Salvar e carregar</button>
+    <div class="ms" id="pa-config-status" style="margin-top:.75rem;"></div>
+  </div>
+
+  <div class="card" id="pa-vinculo-card" style="display:none;">
+    <div class="ct">Correspondência com as colaboradoras do app</div>
+    <div class="ms" style="margin-bottom:.75rem;">
+      Os nomes costumam estar escritos de forma diferente nos dois lugares, então o app faz a
+      correspondência automaticamente (ignora acentos, maiúsculas e apelidos entre parênteses,
+      e casa por nome/sobrenome). Abaixo, como ficou:
+    </div>
+    <div class="tw">
+      <table id="pa-vinculo-tabela" style="min-width:0;">
+        <thead><tr><th>Unidade</th><th>Pessoa na planilha</th><th>Colaboradora(s) no app</th></tr></thead>
+        <tbody id="pa-vinculo-tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -1209,6 +1269,7 @@ async function iniciarSessao(user){
     carregarConfig(),
     carregarPlanilha(),
     carregarDefensivos(),
+    carregarPessoasAtivas(),
     user.permissao==='admin' ? carregarUsuarios() : Promise.resolve()
   ]);
 
@@ -1246,10 +1307,15 @@ function aplicarPermissoes(){
   const btnCfg = document.querySelector('.nt[data-page="page-config"]');
   const btnPlan = document.querySelector('.nt[data-page="page-planilha"]');
   const btnDef = document.querySelector('.nt[data-page="page-defensivos"]');
+  const btnPes = document.querySelector('.nt[data-page="page-pessoas"]');
   btnLanc.style.display = (p==='admin' || p==='editor') ? '' : 'none';
   btnDash.style.display = '';
   btnPlan.style.display = (p==='admin' || p==='editor') ? '' : 'none';
   btnDef.style.display = '';
+  btnPes.style.display = '';
+  // Só admin configura a origem dos dados da equipe.
+  const cardCfgPessoas = document.getElementById('pa-config-card');
+  if(cardCfgPessoas) cardCfgPessoas.style.display = (p==='admin') ? 'block' : 'none';
   btnCfg.style.display = (p==='admin') ? '' : 'none';
 
   document.getElementById('hd-user-name').textContent = usuarioAtual.nome || usuarioAtual.email;
@@ -1744,6 +1810,10 @@ function trocarAba(pageId, btn){
   }
   if(pageId==='page-defensivos'){
     carregarDefensivos();
+  }
+  if(pageId==='page-pessoas'){
+    renderPessoasAtivas();
+    carregarPessoasAtivas(true);
   }
   if(pageId==='page-planilha'){
     renderPlanilha();
@@ -2359,7 +2429,242 @@ function renderGraficoPrincipal(filtrados){
   }
 }
 
-// ══════════════════ DEFENSIVOS (projeto Controle de Aplicação) ══════════
+// ══════════════════ PESSOAS ATIVAS (planilhas de equipe) ══════════════════
+// Cada unidade tem sua aba publicada como CSV. Os endereços ficam salvos no
+// Supabase (tabela config_app), então configurar uma vez vale para todos.
+const EQUIPES = [
+  {unidade:'UBR', chave:'url_csv_equipe_ubr', aba:'Equipe coleta UBR', campo:'pa-url-ubr'},
+  {unidade:'UBN', chave:'url_csv_equipe_ubn', aba:'Equipe coleta UBN', campo:'pa-url-ubn'},
+];
+let pessoasAtivas = [];        // [{nome, funcao, unidade}]
+let urlsEquipe = {};           // {UBR:'...', UBN:'...'}
+
+// Divide uma linha de CSV respeitando aspas.
+function parseLinhaCSV(linha){
+  const campos = []; let atual = '', aspas = false;
+  for(let i=0;i<linha.length;i++){
+    const c = linha[i];
+    if(aspas){
+      if(c === '"'){ if(linha[i+1]==='"'){ atual+='"'; i++; } else aspas=false; }
+      else atual += c;
+    } else {
+      if(c === '"') aspas = true;
+      else if(c === ','){ campos.push(atual); atual=''; }
+      else atual += c;
+    }
+  }
+  campos.push(atual);
+  return campos;
+}
+
+function parseCSV(texto){
+  return texto.replace(/\r\n?/g,'\n').split('\n').map(parseLinhaCSV);
+}
+
+// "Ativo", "Sim", "X", "1", true → considera ativa. Vazio, "Não",
+// "Inativo", "Desligado" → não.
+function marcaAtivo(valor){
+  const v = String(valor ?? '').trim().toLowerCase();
+  if(!v) return false;
+  if(/^(n[ãa]o|inativ|desligad|afastad|0|false)/.test(v)) return false;
+  return /^(sim|ativ|x|1|true|v)/.test(v);
+}
+
+// Normaliza para comparar nomes: sem acento, minúsculo, sem apelido entre
+// parênteses e sem partículas ("de", "da", "dos"...).
+function normalizarNome(nome){
+  return String(nome ?? '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\(.*?\)/g,' ')
+    .toLowerCase()
+    .replace(/[^a-z\s]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function tokensNome(nome){
+  const ignorar = new Set(['de','da','do','das','dos','e','di','du']);
+  return normalizarNome(nome).split(' ').filter(t=> t.length>1 && !ignorar.has(t));
+}
+
+// Duas grafias são da mesma pessoa quando os tokens de uma estão contidos
+// nos da outra (ex.: "Thalyne" ⊂ "Thalyne Salles"), ou quando o primeiro
+// nome bate e um dos lados só tem o primeiro nome.
+function mesmaPessoa(nomeA, nomeB){
+  const a = tokensNome(nomeA), b = tokensNome(nomeB);
+  if(!a.length || !b.length) return false;
+  const setA = new Set(a), setB = new Set(b);
+  const contidoAB = a.every(t=> setB.has(t));
+  const contidoBA = b.every(t=> setA.has(t));
+  if(contidoAB || contidoBA) return true;
+  // Primeiro nome igual e um dos lados é só o primeiro nome.
+  if(a[0] === b[0] && (a.length === 1 || b.length === 1)) return true;
+  return false;
+}
+
+// Uma colaboradora do app está ativa se casa com alguém da planilha.
+// Uma colaboradora do app está ativa se casa com alguém da planilha da
+// MESMA unidade — nomes iguais em unidades diferentes são pessoas
+// diferentes, então a unidade faz parte da comparação.
+function colaboradoraEstaAtiva(nomeColaboradora, unidade){
+  if(!nomeColaboradora || !pessoasAtivas.length) return false;
+  return pessoasAtivas.some(p=>
+    (!unidade || !p.unidade || p.unidade === unidade) && mesmaPessoa(p.nome, nomeColaboradora)
+  );
+}
+
+async function carregarConfigApp(){
+  const chaves = EQUIPES.map(e=>e.chave);
+  const {data, error} = await sb.from('config_app').select('*').in('chave', chaves);
+  if(error){ console.warn('Falha ao ler config:', error); return; }
+  urlsEquipe = {};
+  (data||[]).forEach(linha=>{
+    const eq = EQUIPES.find(e=> e.chave === linha.chave);
+    if(eq && linha.valor) urlsEquipe[eq.unidade] = linha.valor;
+  });
+  EQUIPES.forEach(eq=>{
+    const campo = document.getElementById(eq.campo);
+    if(campo && !campo.value) campo.value = urlsEquipe[eq.unidade] || '';
+  });
+}
+
+async function salvarUrlsEquipe(){
+  const status = document.getElementById('pa-config-status');
+  const paraSalvar = [];
+  for(const eq of EQUIPES){
+    const url = document.getElementById(eq.campo).value.trim();
+    if(!url) continue;
+    if(!/^https:\/\//i.test(url)){
+      status.textContent = 'O endereço da '+eq.unidade+' precisa começar com https://';
+      return;
+    }
+    paraSalvar.push({
+      chave: eq.chave, valor: url,
+      atualizado_em: new Date().toISOString(),
+      atualizado_por: usuarioAtual ? usuarioAtual.email : null
+    });
+  }
+  if(!paraSalvar.length){ status.textContent = 'Informe ao menos um endereço.'; return; }
+
+  const {error} = await sb.from('config_app').upsert(paraSalvar, {onConflict:'chave'});
+  if(error){ avisoErroSupabase('salvar os endereços', error); return; }
+
+  status.textContent = 'Endereço(s) salvo(s).';
+  registrarEvento('config_equipe_url', paraSalvar.map(x=>x.chave).join(', '), usuarioAtual?.email);
+  await carregarConfigApp();
+  carregarPessoasAtivas(true);
+}
+
+// Lê uma aba publicada e devolve as pessoas ativas dela.
+async function lerEquipeCSV(url, unidade, forcar){
+  const resp = await fetch(url, {cache: forcar ? 'reload' : 'default'});
+  if(!resp.ok) throw new Error('HTTP '+resp.status);
+  const linhas = parseCSV(await resp.text());
+
+  // Cabeçalho na linha 2 → dados a partir da linha 3 (índice 2).
+  // Coluna B = nome (índice 1), C = função (2), D = ativo (3).
+  const registros = [];
+  for(let i=2; i<linhas.length; i++){
+    const l = linhas[i] || [];
+    const nome = String(l[1] ?? '').trim();
+    if(!nome) continue;
+    if(!marcaAtivo(l[3])) continue;
+    registros.push({nome, funcao: String(l[2] ?? '').trim(), unidade});
+  }
+  return registros;
+}
+
+async function carregarPessoasAtivas(forcar){
+  const status = document.getElementById('pa-status');
+  if(!Object.keys(urlsEquipe).length) await carregarConfigApp();
+
+  const configuradas = EQUIPES.filter(eq=> urlsEquipe[eq.unidade]);
+  if(!configuradas.length){
+    status.textContent = 'Nenhuma planilha configurada ainda — veja "Origem dos dados" abaixo.';
+    pessoasAtivas = [];
+    renderPessoasAtivas();
+    return;
+  }
+
+  status.textContent = 'Lendo as planilhas de equipe...';
+  const todos = [];
+  const problemas = [];
+
+  // Uma unidade com problema não impede a outra de carregar.
+  await Promise.all(configuradas.map(async eq=>{
+    try{
+      todos.push(...await lerEquipeCSV(urlsEquipe[eq.unidade], eq.unidade, forcar));
+    }catch(e){
+      console.error('Equipe '+eq.unidade+':', e);
+      const bloqueio = /failed to fetch|networkerror|load failed/i.test(e.message||'');
+      problemas.push(eq.unidade+': '+(bloqueio
+        ? 'não foi possível ler (confirme que a aba está publicada na web, não apenas compartilhada)'
+        : e.message));
+    }
+  }));
+
+  // Remove repetições dentro da mesma unidade.
+  const vistos = new Set();
+  pessoasAtivas = todos.filter(p=>{
+    const chave = p.unidade+'|'+normalizarNome(p.nome);
+    if(vistos.has(chave)) return false;
+    vistos.add(chave); return true;
+  }).sort((a,b)=> a.unidade.localeCompare(b.unidade) || a.nome.localeCompare(b.nome));
+
+  status.textContent = problemas.length
+    ? problemas.join(' · ')
+    : (pessoasAtivas.length ? '' : 'As planilhas foram lidas, mas ninguém está marcado como ativo na coluna D.');
+
+  renderPessoasAtivas();
+  // O ranking destaca essas pessoas, então precisa ser redesenhado.
+  if(document.getElementById('page-dashboard').classList.contains('active')) renderRanking();
+}
+
+function renderPessoasAtivas(){
+  const cont = document.getElementById('pa-lista');
+  document.getElementById('pa-count').textContent = pessoasAtivas.length
+    ? (pessoasAtivas.length+' pessoa'+(pessoasAtivas.length!==1?'s':'')+' ativa'+(pessoasAtivas.length!==1?'s':''))
+    : '–';
+
+  // Agrupa por unidade, cada uma com seu bloco de nomes.
+  const porUnidade = {};
+  pessoasAtivas.forEach(p=>{
+    if(!porUnidade[p.unidade]) porUnidade[p.unidade] = [];
+    porUnidade[p.unidade].push(p);
+  });
+  cont.innerHTML = Object.keys(porUnidade).sort().map(un=>`
+    <div style="width:100%;margin-bottom:.75rem;">
+      <div class="filtro-grupo">${escapeHtml(un)} — ${porUnidade[un].length} pessoa(s)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${porUnidade[un].map(p=>`<span class="chip">${escapeHtml(p.nome)}${p.funcao? ' · '+escapeHtml(p.funcao) : ''}</span>`).join('')}
+      </div>
+    </div>`).join('');
+  document.getElementById('pa-empty').style.display = pessoasAtivas.length ? 'none' : 'block';
+
+  // Mostra como cada pessoa da planilha foi casada com as colaboradoras.
+  // A comparação respeita a unidade: só casa com quem lança naquela unidade.
+  const card = document.getElementById('pa-vinculo-card');
+  const nomesApp = [...new Set(db.filter(r=>r.colaboradoraNome).map(r=> r.unidade+'||'+r.colaboradoraNome))];
+  if(!pessoasAtivas.length || !nomesApp.length){ card.style.display='none'; return; }
+  card.style.display = 'block';
+  document.getElementById('pa-vinculo-tbody').innerHTML = pessoasAtivas.map(p=>{
+    const casados = nomesApp
+      .filter(chave=>{
+        const [un, nome] = chave.split('||');
+        return un === p.unidade && mesmaPessoa(p.nome, nome);
+      })
+      .map(chave=> chave.split('||')[1]);
+    return `<tr>
+      <td>${escapeHtml(p.unidade)}</td>
+      <td>${escapeHtml(p.nome)}</td>
+      <td>${casados.length
+        ? escapeHtml([...new Set(casados)].join(', '))
+        : '<span style="color:var(--txm);">sem correspondência nos lançamentos</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+
 // Segundo projeto Supabase, somente leitura. A tabela é fixa ("aplicacoes")
 // e os dados são recarregados a cada abertura da página, para refletir o
 // que foi lançado no sistema de origem.
@@ -3248,9 +3553,11 @@ function renderRanking(){
       : posicao===2 ? '<span class="rank-badge r2">2</span>'
       : posicao===3 ? '<span class="rank-badge r3">3</span>'
       : posicao;
-    return `<tr>
+    // Quem está na equipe ativa da planilha ganha destaque na linha.
+    const ativa = colaboradoraEstaAtiva(g.colaboradoraNome, g.unidade);
+    return `<tr class="${ativa?'linha-ativa':''}">
       <td>${badge}</td>
-      <td>${escapeHtml(g.colaboradora)}${g.colaboradoraNome? ' – '+escapeHtml(g.colaboradoraNome) : ''}</td>
+      <td>${escapeHtml(g.colaboradora)}${g.colaboradoraNome? ' – '+escapeHtml(g.colaboradoraNome) : ''}${ativa? ' <span class="tag-ativa">ativa</span>' : ''}</td>
       <td>${escapeHtml(g.unidade)}</td>
       <td>${g.lancamentos}</td>
       <td>${g.plantadas}</td>
