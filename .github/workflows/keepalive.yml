@@ -1,0 +1,43 @@
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping no banco (ping_keepalive)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::Faltam os secrets SUPABASE_URL e/ou SUPABASE_ANON_KEY."
+            exit 1
+          fi
+
+          resposta=$(mktemp)
+          codigo=$(curl --silent --show-error --fail-with-body \
+            --retry 3 --retry-delay 20 --retry-all-errors \
+            --max-time 30 \
+            --output "$resposta" --write-out '%{http_code}' \
+            -X POST "${SUPABASE_URL}/rest/v1/rpc/ping_keepalive" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          echo "HTTP $codigo"
+          echo "Resposta: $(cat "$resposta")"
+
+          if [ "$codigo" != "200" ]; then
+            echo "::error::Ping falhou (HTTP $codigo)."
+            exit 1
+          fi
+
+          echo "Projeto Supabase acordado em $(date -u '+%Y-%m-%d %H:%M UTC')."
