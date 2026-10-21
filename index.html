@@ -1098,22 +1098,59 @@ function precisaRecarregar(chave, forcar){
   return !t || (Date.now() - t) > (VALIDADE_CACHE[chave] || 120000);
 }
 
+// O PostgREST do Supabase devolve no máximo 1000 linhas por requisição.
+// Esta função busca a tabela inteira em blocos até acabar.
+// "montarConsulta" recebe nada e devolve um select já ordenado.
+const TAMANHO_PAGINA_SUPABASE = 1000;
+
+async function buscarTodos(montarConsulta, rotuloErro){
+  const todos = [];
+  let inicio = 0;
+
+  for(;;){
+    const fim = inicio + TAMANHO_PAGINA_SUPABASE - 1;
+    const {data, error} = await montarConsulta().range(inicio, fim);
+
+    if(error){
+      avisoErroSupabase(rotuloErro, error);
+      return {dados: todos, erro: error};
+    }
+
+    const bloco = data || [];
+    todos.push(...bloco);
+
+    if(bloco.length < TAMANHO_PAGINA_SUPABASE) break;
+    inicio += TAMANHO_PAGINA_SUPABASE;
+
+    // trava de segurança contra loop infinito
+    if(inicio > 500000) break;
+  }
+
+  return {dados: todos, erro: null};
+}
+
 async function carregarLancamentos(forcar){
   if(!precisaRecarregar('lancamentos', forcar)) return;
-  const {data, error} = await sb.from('lancamentos').select('*').order('data',{ascending:false}).order('criado_em',{ascending:false});
-  if(error){ avisoErroSupabase('carregar lançamentos', error); return; }
-  db = (data||[]).map(rowParaRegistro);
+  // "id" entra como critério final de ordenação para a paginação ser
+  // estável (data/criado_em podem repetir e embaralhar os blocos).
+  const {dados, erro} = await buscarTodos(
+    ()=> sb.from('lancamentos').select('*')
+           .order('data',{ascending:false})
+           .order('criado_em',{ascending:false})
+           .order('id',{ascending:false}),
+    'carregar lançamentos'
+  );
+  if(erro) return;
+  db = dados.map(rowParaRegistro);
   ultimaCarga.lancamentos = Date.now();
 }
 
 async function carregarConfig(forcar){
   if(!precisaRecarregar('config', forcar)) return;
-  const [{data:clonesRows, error:e1}, {data:colabRows, error:e2}] = await Promise.all([
-    sb.from('clones_unidade').select('*'),
-    sb.from('colaboradoras_unidade').select('*')
+  const [{dados:clonesRows}, {dados:colabRows}] = await Promise.all([
+    buscarTodos(()=> sb.from('clones_unidade').select('*').order('id',{ascending:true}), 'carregar clones'),
+    buscarTodos(()=> sb.from('colaboradoras_unidade').select('*').order('id',{ascending:true}), 'carregar colaboradoras')
   ]);
-  if(e1) avisoErroSupabase('carregar clones', e1);
-  if(e2) avisoErroSupabase('carregar colaboradoras', e2);
   config = {clones:{}, colaboradoras:{}};
   UNIDADES.forEach(u=>{ config.clones[u] = []; config.colaboradoras[u] = {}; });
   (clonesRows||[]).forEach(r=>{ if(config.clones[r.unidade]) config.clones[r.unidade].push(r.clone); });
